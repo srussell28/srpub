@@ -82,7 +82,8 @@ def check_config():
 
     is_sam = any(
         alias in (os.environ.get("USER", "") + os.environ.get("HOME", ""))
-        for alias in name_aliases + ["sr228822", "samrussell", "samuel"]
+        for alias in name_aliases
+        + ["sr228822", "samrussell", "samuel", "a.sam.russell"]
     )
 
     print("1st run checking git config:")

@@ -119,45 +119,33 @@ def git_op_colored(command: str) -> str:
     return cleaned
 
 
+_COMMIT_FMT = '"%Cgreen%h%Creset  %as  %an %C(yellow)%d%Creset%n   %s%n"'
+_COMMIT_FMT_PLAIN = '"%h  %as  %an%n   %s%n"'
+
+
 def show_sha(sha: str):
-    """
-    Show details of a single commit (with colors) by SHA.
-    """
-    command = (
-        f'git --no-pager log --color=always --pretty=format:"%Cgreen%H%Creset   %an '
-        f'%C(yellow)%d%Creset%n   %s%n" -1 {sha}'
-    )
+    command = f"git --no-pager log --color=always --pretty=format:{_COMMIT_FMT} -1 {sha}"
     return git_op_colored(command)
 
 
 def show_shas(sha_first: str, sha_last: str, nmax: int = 100) -> str:
-    """
-    Show details of a range of commits between sha_first and sha_last.
-    """
     command = (
         f"git --no-pager log -n {nmax} --color=always "
-        f'--pretty=format:"%Cgreen%H%Creset   %an %C(yellow)%d%Creset%n   %s%n" '
-        f"{sha_first}...{sha_last}"
+        f"--pretty=format:{_COMMIT_FMT} {sha_first}...{sha_last}"
     )
     return git_op_colored(command)
 
 
 def show_my_most_recent(fb: str):
-    """
-    Show the most recent commit by the author Russell on the given branch.
-    """
     command = (
         f"git --no-pager log --color=always --author=Russell "
-        f'--pretty=format:"%Cgreen%H%Creset   %an %C(yellow)%d%Creset%n   %s%n" -1 {fb}'
+        f"--pretty=format:{_COMMIT_FMT} -1 {fb}"
     )
     return git_op_colored(command)
 
 
 def show_sha_grey(sha: str):
-    """
-    Show a commit with a grey-style highlight.
-    """
-    command = f'git --no-pager log --pretty=format:"%H   %an%n   %s%n%Creset" -1 {sha}'
+    command = f"git --no-pager log --pretty=format:{_COMMIT_FMT_PLAIN} -1 {sha}"
     if is_windows:
         cmd(command, straight_through=True)
         return
@@ -174,20 +162,25 @@ def show_sha_grey(sha: str):
 
 
 def show_sha_magenta(sha: str):
-    """
-    Show a commit with a magenta-style highlight.
-    """
-    command = f'git --no-pager log --pretty=format:"%C(magenta)%H%Creset   %an%n   %s%n" -1 {sha}'
-    if is_windows:
-        cmd(command, straight_through=True)
-        return
+    command = (
+        f'git --no-pager log --color=always --pretty=format:'
+        f'"%C(magenta)%h%Creset  %as  %an %C(yellow)%d%Creset%n   %s%n" -1 {sha}'
+    )
+    return git_op_colored(command)
 
-    res = cmd(command)
-    res = res.replace(sha, magenta_str(sha))
-    for alias in name_aliases:
-        res = res.replace(alias, blue_str(alias))
-    print(res)
-    print("")
+
+def branch_diff_stat(base_sha: str, tip_ref: str) -> str:
+    """Return a compact '+N -M (K files)' string for the diff between base and tip."""
+    raw = cmd(f"git diff --shortstat {base_sha}..{tip_ref}").strip()
+    m_files = re.search(r"(\d+) file", raw)
+    m_ins = re.search(r"(\d+) insertion", raw)
+    m_del = re.search(r"(\d+) deletion", raw)
+    if not m_files:
+        return ""
+    files = m_files.group(1)
+    ins = m_ins.group(1) if m_ins else "0"
+    dels = m_del.group(1) if m_del else "0"
+    return f"+{ins} -{dels} ({files} {'file' if files == '1' else 'files'})"
 
 
 def fetch_commits_for_branch(branch: str, n: int) -> list:
@@ -444,6 +437,7 @@ def main():
 
     # When not tracking main, compute "made" relative to origin/main
     # so our branch commits show above the separator
+    main_merge_base = None
     if fb != origin_main:
         main_merge_base = cmd(f"git merge-base {target_ref} {origin_main}").strip()
         main_ahead_raw = cmd(
@@ -521,15 +515,28 @@ def main():
     # If only 1 col fits; otherwise cap at 3 columns
     branch_cols = min(3, branch_cols)
 
+    # Compute branch diff stat for display in header
+    if made or fb != origin_main:
+        stat_base = main_merge_base if fb != origin_main and main_merge_base else merge_base
+        diff_stat = branch_diff_stat(stat_base, target_ref) if stat_base else ""
+    else:
+        diff_stat = ""
+
     print()
     print("*" * (cols - 10))
     age_prefix = " " * 5  # match age column width
     if current_branch == "HEAD":
         print(age_prefix + magenta_str(bold_str("~~ HEAD detached ~~")))
     elif args.branch:
-        print(age_prefix + green_str(bold_str(current_branch)))
+        branch_line = green_str(bold_str(current_branch))
+        if diff_stat:
+            branch_line += "  " + green_str(diff_stat)
+        print(age_prefix + branch_line)
     else:
-        print(age_prefix + blue_str(bold_str(current_branch)))
+        branch_line = blue_str(bold_str(current_branch))
+        if diff_stat:
+            branch_line += "  " + grey_str(diff_stat)
+        print(age_prefix + branch_line)
 
     # Get remote status if flag enabled
     remote_status = get_branch_remote_status(cache) if not args.no_remote_status else {}

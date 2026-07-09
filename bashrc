@@ -984,7 +984,12 @@ gbd() {
         wt_path=$(_worktree_path_for_branch "$branch")
         if [ -n "$wt_path" ]; then
             echo "removing worktree at $wt_path for branch '$branch'" | yellow
-            git worktree remove --force "$wt_path"
+            if ! git worktree remove --force "$wt_path" 2>/dev/null; then
+                # Worktree dir is gone/corrupt (e.g. a stale Claude scratchpad).
+                # Prune the dead ref so git lets us delete the branch.
+                echo "worktree remove failed, pruning stale ref" | yellow
+                git worktree prune
+            fi
         fi
     fi
 

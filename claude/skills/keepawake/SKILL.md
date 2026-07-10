@@ -1,48 +1,93 @@
 ---
 name: keepawake
-description: Keep the Mac awake (lid closed, display off) while doing a long task, then release when done. Uses caffeinate -si to block system and idle sleep.
+description: Keep the Mac awake (lid closed, display off) while doing a long task, then release when done. Soft mode uses caffeinate -si (AC only); hard mode also disables battery sleep via sudo pmset.
 ---
 
 # keepawake
 
-Prevent the Mac from sleeping during a long-running task — including when the lid is closed. Uses `caffeinate -si` which blocks both system sleep (`-s`, requires AC power) and idle sleep (`-i`). The display is allowed to sleep; only the CPU/network stays up.
+Prevent the Mac from sleeping during a long-running task — including when the lid is closed.
 
-## PID file
+Two modes:
+- **Soft** (default): `caffeinate -si` — prevents idle and system sleep. Works reliably on AC power; on battery with lid closed macOS may still override it.
+- **Hard**: `caffeinate -si` + `sudo pmset -b sleep 0` — disables battery sleep at the OS level. Works on battery too. Requires passwordless sudo for `/usr/bin/pmset` (see setup below).
 
-`~/.claude/keepawake.pid` — stores the caffeinate PID so it can be stopped later. Always check this file before starting to avoid stacking multiple processes.
+The display is allowed to sleep in both modes; only the CPU/network stays up.
 
-## Start
+## PID/state files
 
-Run this at the beginning of any task that will take more than a few minutes or that involves background agents:
+- `~/.claude/keepawake.pid` — caffeinate PID
+- `~/.claude/keepawake.sleep` — original battery sleep value (hard mode only, for restore)
+
+## Check if hard mode is available
+
+Before offering hard mode, check if passwordless sudo pmset works:
 
 ```bash
-# Check if already running
-if [ -f ~/.claude/keepawake.pid ] && kill -0 "$(cat ~/.claude/keepawake.pid)" 2>/dev/null; then
-    echo "keepawake already active (PID $(cat ~/.claude/keepawake.pid))"
+if sudo -n pmset -g 2>/dev/null | grep -q sleep; then
+    echo "hard mode available"
 else
-    caffeinate -si &
-    echo $! > ~/.claude/keepawake.pid
-    echo "keepawake started (PID $!)"
+    echo "hard mode unavailable (no passwordless sudo pmset)"
 fi
 ```
 
-Tell the user: "Keeping the Mac awake while I work — will release when done."
+If unavailable, fall back to soft mode and note that `-s` only holds on AC power. To enable hard mode, the user can run:
+```bash
+echo 'sam ALL=(ALL) NOPASSWD: /usr/bin/pmset' | sudo tee /etc/sudoers.d/pmset && sudo chmod 440 /etc/sudoers.d/pmset
+```
+
+## Start
+
+Check if already running first. If the user is on battery with the lid closed, offer hard mode if available:
+
+```bash
+# Already running?
+if [ -f ~/.claude/keepawake.pid ] && kill -0 "$(cat ~/.claude/keepawake.pid)" 2>/dev/null; then
+    echo "keepawake already active (PID $(cat ~/.claude/keepawake.pid))"
+    exit 0
+fi
+
+HARD=${1:-false}  # pass "hard" as argument for hard mode
+
+caffeinate -si &
+echo $! > ~/.claude/keepawake.pid
+echo "caffeinate started (PID $!)"
+
+if [ "$HARD" = "hard" ]; then
+    if sudo -n pmset -g &>/dev/null; then
+        original=$(pmset -g | awk '/^[ \t]+sleep / {print $2; exit}')
+        echo "$original" > ~/.claude/keepawake.sleep
+        sudo pmset -b sleep 0
+        echo "hard mode: battery sleep disabled (was ${original}min)"
+    else
+        echo "hard mode requested but sudo pmset not available — soft mode only"
+    fi
+fi
+```
+
+Tell the user which mode is active and note AC-only limitation if soft mode on battery.
 
 ## Stop
 
-Run this when the task is complete:
-
 ```bash
+# Kill caffeinate
 if [ -f ~/.claude/keepawake.pid ]; then
     pid=$(cat ~/.claude/keepawake.pid)
-    if kill "$pid" 2>/dev/null; then
-        echo "keepawake stopped (PID $pid)"
-    else
-        echo "keepawake PID $pid was already gone"
-    fi
+    kill "$pid" 2>/dev/null && echo "caffeinate stopped (PID $pid)" || echo "caffeinate was already gone"
     rm -f ~/.claude/keepawake.pid
 else
-    echo "keepawake not running"
+    echo "caffeinate not running"
+fi
+
+# Restore pmset if hard mode was active
+if [ -f ~/.claude/keepawake.sleep ]; then
+    original=$(cat ~/.claude/keepawake.sleep)
+    if sudo -n pmset -g &>/dev/null; then
+        sudo pmset -b sleep "$original"
+        echo "battery sleep restored to ${original}min"
+    else
+        echo "WARNING: could not restore battery sleep setting — run: sudo pmset -b sleep $original"
+    fi
+    rm -f ~/.claude/keepawake.sleep
 fi
 ```
 
@@ -52,22 +97,25 @@ Tell the user: "Released sleep prevention — Mac can sleep normally now."
 
 ```bash
 if [ -f ~/.claude/keepawake.pid ] && kill -0 "$(cat ~/.claude/keepawake.pid)" 2>/dev/null; then
-    echo "keepawake active (PID $(cat ~/.claude/keepawake.pid))"
-    pmset -g assertions | grep -i "PreventSystemSleep\|PreventUserIdleSystemSleep" | head -5
+    mode=$([ -f ~/.claude/keepawake.sleep ] && echo "hard" || echo "soft")
+    echo "keepawake active — $mode mode (PID $(cat ~/.claude/keepawake.pid))"
+    pmset -g | awk '/^[ \t]+sleep / {print "battery sleep timeout: "$2"min"}'
+    pmset -g assertions | grep -i "PreventSystemSleep\|PreventUserIdleSystemSleep" | head -3
 else
     echo "keepawake not running"
-    rm -f ~/.claude/keepawake.pid 2>/dev/null
+    rm -f ~/.claude/keepawake.pid ~/.claude/keepawake.sleep 2>/dev/null
 fi
 ```
 
 ## When to use
 
-- **Start automatically** when the user asks you to do something that will take a long time (e.g. a big refactor, running a build, a background agent sweep) and mentions closing the lid or stepping away.
+- **Soft mode**: user is on AC power or doesn't mention battery/lid concerns. Default.
+- **Hard mode**: user says they'll close the lid on battery, or soft mode has failed before. Check availability first.
 - **Stop automatically** when the long task completes, before ending your response.
 - **Don't start** for quick tasks — only when there's a real risk of the Mac sleeping mid-work.
 
 ## Important notes
 
-- `-s` only works on AC power. If the Mac is on battery and the lid is closed, macOS may still sleep. Mention this if it seems relevant.
-- If the Stop hook kills caffeinate, verify with `pmset -g assertions` that no PreventSystemSleep assertions remain. A runaway caffeinate will drain battery.
-- If you crash mid-task and the pid file is stale, the next Start run will detect `kill -0` failure and overwrite it cleanly.
+- Always restore pmset on stop — a forgotten `sleep 0` setting drains battery.
+- If the session crashes with hard mode active, the `.sleep` file persists and the next stop will restore correctly. If the file is lost, remind the user to run `sudo pmset -b sleep 10` (or their preferred timeout) manually.
+- Stale PID file: `kill -0` failure means caffeinate is gone; overwrite cleanly on next start.

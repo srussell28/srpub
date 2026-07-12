@@ -3,19 +3,24 @@ This solution is more complicated, but efficient
 because it will not re-do computation on get calls
 """
 
+from dataclasses import dataclass, field
 
+
+class CycleError(Exception):
+    pass
+
+
+@dataclass
 class Cell:
-    def __init__(self):
-        self.raw = None
-        self.value = None
+    raw: str | None = None
+    value: str | int | None = None
 
-        # A map containing the addrs of all cells
-        # referencing this one
-        self.dependents = {}
+    # the addrs of all cells referencing this one
+    dependents: set[str] = field(default_factory=set)
 
-        # the addrs this cell's formula references,
-        # so we can drop stale edges when its replaced
-        self.references = set()
+    # the addrs this cell's formula references,
+    # so we can drop stale edges when its replaced
+    references: set[str] = field(default_factory=set)
 
 
 def is_formula(v):
@@ -26,7 +31,7 @@ def is_number(v):
     try:
         int(v)
         return True
-    except Exception:
+    except (ValueError, TypeError):
         return False
 
 
@@ -43,7 +48,7 @@ class MySheet:
                 s += int(x)
             else:
                 # if its not a number, it must be a cell-addr
-                other = self.data.get(x, None)
+                other = self.data.get(x)
                 # if referenced cell doesnt exit, create it
                 if not other:
                     other = Cell()
@@ -51,7 +56,7 @@ class MySheet:
                 # Put this cell as a dependent of the other
                 if other:
                     s += other.value or 0
-                    other.dependents[addr] = True
+                    other.dependents.add(addr)
                     cell.references.add(x)
 
         return s
@@ -62,7 +67,7 @@ class MySheet:
             loop_orig = addr
         else:
             if addr == loop_orig:
-                raise Exception("Cycle Error")
+                raise CycleError(f"cycle detected at {addr}")
 
         # get existing cell, or create one
         c = self.data.get(addr, Cell())
@@ -70,7 +75,7 @@ class MySheet:
             # the raw changed, drop the old dependency edges so a
             # replaced formula can't leave phantom cycles behind
             for ref in c.references:
-                self.data[ref].dependents.pop(addr, None)
+                self.data[ref].dependents.discard(addr)
             c.references = set()
             c.raw = value
 
@@ -83,7 +88,7 @@ class MySheet:
             c.value = str(c.raw)
 
         # update dependents
-        for dep in c.dependents.keys():
+        for dep in c.dependents:
             self._update(dep, loop_orig=loop_orig)
 
         self.data[addr] = c
@@ -93,7 +98,7 @@ class MySheet:
         self._update(addr, value=value)
 
     def get(self, addr):
-        c = self.data.get(addr, None)
+        c = self.data.get(addr)
         return c.value if c else ""
 
 
@@ -143,7 +148,7 @@ sheet.put("Q2", "=Q3+2")
 did_error = False
 try:
     sheet.put("Q3", "=Q1+2")
-except Exception as e:
+except CycleError as e:
     did_error = True
     print(f"Did correctly error: {e}")
 if not did_error:

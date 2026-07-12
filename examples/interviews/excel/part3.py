@@ -16,13 +16,10 @@ class MySheet:
         self.data = {}
 
     def put(self, addr, value):
-        lock.acquire()
-        try:
+        with lock:
             if is_formula(value):
                 value = eval_formula(value)
             self.data[addr] = value
-        finally:
-            lock.release()
 
     def get(self, addr):
         # single dict reads are atomic in cpython, no lock needed
@@ -53,7 +50,7 @@ def put(addr):
     content = request.get_json()
     if not content:
         return "request body required", 400
-    value = content.get("value", None)
+    value = content.get("value")
     if not value:
         return "value required", 400
     sheet.put(addr, value)
@@ -61,7 +58,7 @@ def put(addr):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port="5050")
+    app.run(debug=True, host="127.0.0.1", port=5050)
 
 
 # curl -XPUT -H "Content-Type:application/json" "127.0.01:5050/cell/A1" --data '{"value": "hello"}'

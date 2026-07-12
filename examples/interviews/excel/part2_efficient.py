@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Cell:
-    raw: str = None
-    value: str = None
+    raw: str | None = None
+    value: str | None = None
     dependents: set[str] = field(default_factory=set)
 
 
@@ -33,7 +33,7 @@ class MySheet:
             else:
                 # if its not a number, it must be a cell-addr
                 assert re.match(r"^[A-Z]+\d+$", term)
-                ref_cell = self.data.get(term, None)
+                ref_cell = self.data.get(term)
 
                 # if the referenced cell doesnt exist yet, create an
                 # empty placeholder so we still record the dependency
@@ -71,7 +71,7 @@ class MySheet:
         self._update(addr, value=value)
 
     def get(self, addr):
-        c = self.data.get(addr, None)
+        c = self.data.get(addr)
         # empty placeholder cells have value None
         return c.value if c and c.value is not None else ""
 

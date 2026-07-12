@@ -1,6 +1,9 @@
 """
 This solution is more complicated, but efficient
 because it will not re-do computation on get calls
+
+Note it does not detect reference cycles,
+see part2_hard_mode.py for that
 """
 
 import re
@@ -16,12 +19,12 @@ class Cell:
 
 class MySheet:
     def __init__(self):
-        self.data: [str, Cell] = {}
+        self.data: dict[str, Cell] = {}
 
     def _eval_formula(self, addr, v) -> int:
         # Could use re.finditer("[^\+^ ^=]+", v) here for better
         # mem-efficiency than split
-        terms = v.lstrip("=").split("+")
+        terms = [t.strip() for t in v.lstrip("=").split("+")]
 
         s = 0
         for term in terms:
@@ -29,13 +32,19 @@ class MySheet:
                 s += int(term)
             else:
                 # if its not a number, it must be a cell-addr
-                assert re.match("^[A-Z]+\d+$", term)
+                assert re.match(r"^[A-Z]+\d+$", term)
                 ref_cell = self.data.get(term, None)
 
+                # if the referenced cell doesnt exist yet, create an
+                # empty placeholder so we still record the dependency
+                if not ref_cell:
+                    ref_cell = Cell()
+                    self.data[term] = ref_cell
+
                 # Put this cell as a dependent of the other
-                if ref_cell:
+                if ref_cell.value:
                     s += int(ref_cell.value)
-                    ref_cell.dependents.add(addr)
+                ref_cell.dependents.add(addr)
 
         return s
 
@@ -63,7 +72,8 @@ class MySheet:
 
     def get(self, addr):
         c = self.data.get(addr, None)
-        return c.value if c else ""
+        # empty placeholder cells have value None
+        return c.value if c and c.value is not None else ""
 
 
 def _test(sheet, addr, expected, annotation=""):
@@ -95,6 +105,14 @@ def test_part2():
 
     sheet.put("B2", "=10+10")
     _test(sheet, "C3", "22", "nested formulas")
+
+    sheet.put("G1", "= B2 + 2")
+    _test(sheet, "G1", "22", "spaces in formula")
+
+    sheet.put("F4", "=F5+2")
+    _test(sheet, "F4", "2", "reference to not-yet-set cell")
+    sheet.put("F5", "3")
+    _test(sheet, "F4", "5", "forward reference updated")
 
 
 if __name__ == "__main__":

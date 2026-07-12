@@ -3,7 +3,7 @@ def is_formula(v):
 
 
 def eval_formula(v):
-    r = v.strip("=")
+    r = v.strip().lstrip("=")
     terms = r.split("+")
     as_ints = [int(x) for x in terms]
     return sum(as_ints)

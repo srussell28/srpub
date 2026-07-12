@@ -1,8 +1,13 @@
-from multiprocessing import Lock
+from threading import Lock
 
 from flask import Flask, request
 
 app = Flask(__name__)
+
+# flask serves requests on multiple threads, so a single in-process
+# lock is enough here.  With multiple worker processes (gunicorn etc)
+# both this lock and the in-memory dict break, and we'd need to move
+# the data to a real shared datastore.
 lock = Lock()
 
 
@@ -20,6 +25,7 @@ class MySheet:
             lock.release()
 
     def get(self, addr):
+        # single dict reads are atomic in cpython, no lock needed
         return self.data.get(addr, "")
 
 
@@ -31,7 +37,7 @@ def is_formula(v):
 
 
 def eval_formula(v):
-    r = v.strip("=")
+    r = v.strip().lstrip("=")
     terms = r.split("+")
     as_ints = [int(x) for x in terms]
     return sum(as_ints)

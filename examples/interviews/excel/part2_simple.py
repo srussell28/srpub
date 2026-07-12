@@ -19,7 +19,7 @@ class MySheet:
             return int(thing)
 
         # if its not a number, it must be a cell-addr
-        assert re.match("^[A-Z]+\d+$", thing)
+        assert re.match(r"^[A-Z]+\d+$", thing)
 
         return int(self.get(thing, default=0))
 

@@ -13,12 +13,9 @@ class Cell:
         # referencing this one
         self.dependents = {}
 
-    def put(self, raw):
-        self.raw = raw
-        self.is_form = is_formula(raw)
-
-    def value(self):
-        return self.val or 0
+        # the addrs this cell's formula references,
+        # so we can drop stale edges when its replaced
+        self.references = set()
 
 
 def is_formula(v):
@@ -37,7 +34,7 @@ class MySheet:
     def __init__(self):
         self.data = {}
 
-    def _eval_formula(self, addr, v):
+    def _eval_formula(self, cell, addr, v):
         r = v.strip().lstrip("=")
         terms = [x.strip() for x in r.split("+")]
         s = 0
@@ -55,6 +52,7 @@ class MySheet:
                 if other:
                     s += other.value or 0
                     other.dependents[addr] = True
+                    cell.references.add(x)
 
         return s
 
@@ -68,14 +66,19 @@ class MySheet:
 
         # get existing cell, or create one
         c = self.data.get(addr, Cell())
-        if value:
+        if value is not None:
+            # the raw changed, drop the old dependency edges so a
+            # replaced formula can't leave phantom cycles behind
+            for ref in c.references:
+                self.data[ref].dependents.pop(addr, None)
+            c.references = set()
             c.raw = value
 
         # put value from the raw
         if is_number(c.raw):
             c.value = int(c.raw)
         elif is_formula(c.raw):
-            c.value = self._eval_formula(addr, c.raw)
+            c.value = self._eval_formula(c, addr, c.raw)
         else:
             c.value = str(c.raw)
 
@@ -145,3 +148,10 @@ except Exception as e:
     print(f"Did correctly error: {e}")
 if not did_error:
     print("Should have errored for cycle, but did not")
+
+print("\nhard mode, replacing a formula drops the old reference")
+sheet.put("R1", "1")
+sheet.put("R2", "=R1+1")
+sheet.put("R2", "5")
+sheet.put("R1", "=R2")  # R2 no longer references R1, so not a cycle
+print("R1 should be 5:", sheet.get("R1"))

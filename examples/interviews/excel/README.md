@@ -17,19 +17,19 @@ Example Use:
 ```
 >>> sheet = MySheet()
 
->>> sheet.set("A1", "hello")
+>>> sheet.put("A1", "hello")
 >>> sheet.get("A1")
 hello
 
->>> sheet.set("B2", "5")
+>>> sheet.put("B2", "5")
 >>> sheet.get("B2")
 5
 
->>> sheet.set("A3", "=2+2")
+>>> sheet.put("A3", "=2+2")
 >>> sheet.get("A3")
 4
 
->>> sheet.set("C3", "=B2+2")
+>>> sheet.put("C3", "=B2+2")
 >>> sheet.get("C3")
 7
 ```
@@ -42,12 +42,12 @@ hello
   we will only support addition in formulas.
 * The backend can operate as a class, and does not need to load/save data to disk.
   New sheets can be initialized as empty
-* The backend should support at least a `set` and `get` operation.  All data will
-  be sent and strings and should be returned as strings.
+* The backend should support at least a `put` and `get` operation.  All data will
+  be sent as strings and should be returned as strings.
 * We do not need to support any style formatting, or other unshown operations like row-summing
 
 Common Questions
-(You shouldn't necessary give this information up-front, but most candidates will end up asking)
+(You shouldn't necessarily give this information up-front, but most candidates will end up asking)
 
 * <b>How many rows/columns should the sheet be?</b>  Infinite, or resizeable to arbitrary sizes.
   We should be able set cell `ZZZ99999` without it breaking.  If its easier you can start with a fixed size
@@ -58,9 +58,9 @@ Common Questions
 
 #### Example Solution
 
-See [part1.py](part1.py) in this folder for a solution that supports fomulas but not references.
+See [part1.py](part1.py) in this folder for a solution that supports formulas but not references.
 
-Some candiates will evaluate formulas on either the set or the get.
+Some candidates will evaluate formulas on either the put or the get.
 It doesn't really matter at this point, but will become important later.
 
 #### Discussion
@@ -109,13 +109,24 @@ give them the extra test-cases below.
 22
 ```
 
-Doing effient evaluation is tricky here, because you need to keep track of
+Doing efficient evaluation is tricky here, because you need to keep track of
 graph of relationships between cells, and only update cells when a cell they
 depend on gets updated.   The lazy solution is functionally correct, but
 would incur significant cost if there are larger graphs of cell dependencies.
+
+A nice middle-ground some candidates find is lazy evaluation with caching:
+cache each computed value, and on put just walk the dependents marking them
+dirty rather than recomputing them.  Gets only recompute dirty cells, so
+writes stay cheap and repeated reads don't redo work.
+
+Strong candidates may also ask (or should be asked) about circular references
+(`A1="=B1"`, `B1="=A1"`).  Ideally these are detected and rejected with an
+error on put; the lazy solution will hit infinite recursion.  See
+[part2_hard_mode.py](part2_hard_mode.py) for a solution handling this, along
+with other edge cases like forward references to cells that don't exist yet.
 
 ## Possible Extensions
 
 * Implement your solution as a web-service (like in Google-Sheets) that can support
   multiple concurrent editors. (Reference solution in [part3.py](part3.py) )
-* Imlement efficient saving-to-disk and loading-to-disk
+* Implement efficient saving-to-disk and loading-to-disk

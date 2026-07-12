@@ -909,7 +909,7 @@ gitcleanmain() {
 }
 
 git_push_as_me() {
-    git push https://sr228822@github.com/sr228822/srpub main:main
+    git push https://srussell28@github.com/srussell28/srpub main:main
 }
 
 git_pre_push() {

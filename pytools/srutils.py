@@ -530,14 +530,8 @@ def cmd(c, wait=True, noisy=False, straight_through=False):
 
 
 def get_term_size():
-    try:
-        resp = cmd("stty size")
-        if "command not found" in resp or "not recognized" in resp:
-            raise ValueError("no stty")
-        rows, cols = resp.split()
-        return int(rows), int(cols)
-    except ValueError:
-        return 80, 160
+    size = shutil.get_terminal_size(fallback=(160, 80))
+    return size.lines, size.columns
 
 
 def env_metadata():

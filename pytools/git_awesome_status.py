@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 import argparse
-import concurrent.futures
 import datetime
 import re
 import sys
-from operator import itemgetter
 from pathlib import Path
 
 from srutils import (
@@ -231,27 +229,29 @@ def fb_alternate() -> str:
     return None
 
 
-def get_branch_age(branch: str):
+def get_branch_ages() -> list:
     """
-    Return a tuple of (branch, datetime, age_str).
+    Return [(branch, age_str)] for all local branches, newest-commit first.
+    One for-each-ref call instead of a git-log subprocess per branch.
     """
-    try:
-        stats = (
-            cmd(f'git log -n 1 --pretty=format:"%ci %cr" {branch} -- | head -n 1')
-            .strip()
-            .split(" ")
-        )
-        dt = datetime.datetime.strptime(stats[0] + " " + stats[1], "%Y-%m-%d %H:%M:%S")
-        age = stats[3] + " " + stats[4] if len(stats) > 4 else ""
+    raw = cmd(
+        "git for-each-ref refs/heads --sort=-committerdate "
+        '--format="%(refname:short)|%(committerdate:relative)"'
+    )
+    ages = []
+    for line in raw.strip().split("\n"):
+        if "|" not in line:
+            continue
+        branch, rel = line.split("|", 1)
+        parts = rel.split(" ")
+        age = parts[0] + " " + parts[1] if len(parts) > 2 else ""
         age = age.replace(" weeks", "w")
         age = age.replace(" days", "d")
         age = age.replace(" months", "m")
         age = age.replace(" years", "y")
         age = age.replace(" year", "y")
-    except Exception:
-        dt = datetime.datetime.now()
-        age = ""
-    return branch, dt, age
+        ages.append((branch, age))
+    return ages
 
 
 def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
@@ -545,15 +545,10 @@ def main():
     # Get remote status if flag enabled
     remote_status = get_branch_remote_status(cache) if not args.no_remote_status else {}
 
-    # Retrieve branch ages concurrently
-    branch_data = []
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(get_branch_age, b) for b in other_branches]
-        for future in concurrent.futures.as_completed(futures):
-            branch_data.append(future.result())
-
-    branch_data_sorted = sorted(branch_data, key=itemgetter(1), reverse=True)
-    for idx, (branch, dt, age) in enumerate(branch_data_sorted):
+    # Branch ages come from one for-each-ref call, already sorted newest-first
+    other_set = set(other_branches)
+    branch_data_sorted = [x for x in get_branch_ages() if x[0] in other_set]
+    for idx, (branch, age) in enumerate(branch_data_sorted):
         # If age is in hours/minutes, optionally skip showing it.
         if "seconds" in age or "minutes" in age or "hours" in age:
             age = ""
@@ -564,7 +559,7 @@ def main():
         elif not args.no_remote_status:
             padded_branch = color_branch_by_remote(branch, padded_branch, remote_status)
         print(grey_str("%4s" % age) + " " + padded_branch, end="")
-        if (idx + 1) % branch_cols == 0 or idx == len(branch_data) - 1:
+        if (idx + 1) % branch_cols == 0 or idx == len(branch_data_sorted) - 1:
             print("")
 
     if archived_branches:

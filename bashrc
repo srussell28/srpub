@@ -32,11 +32,11 @@ export PATH=${PATH}:$SRPUB_DIR/pytools
 export PYTHONPATH=${PYTHONPATH}:$HOME/customize
 export PYTHONPATH=${PYTHONPATH}:$SRPUB_DIR
 export PYTHONPATH=${PYTHONPATH}:$SRPUB_DIR/pytools
-export PYTHONUNBUFFERED="nope"
+export PYTHONUNBUFFERED="1"
 
-# git initialization
-git config --global core.editor "vim"
-git config --global user.name "Samuel Russell"
+# git initialization (only write if unset, so per-machine overrides stick)
+git config --global --get core.editor >/dev/null || git config --global core.editor "vim"
+git config --global --get user.name >/dev/null || git config --global user.name "Samuel Russell"
 #git config --global user.email "foobar@foobar.foo"
 
 export KUBE_EDITOR='vim'
@@ -78,7 +78,7 @@ TIMEFORMAT='%R'
 ############################################################
 #     History
 ############################################################
-# Generate unique 6-character session ID
+# Generate unique 4-character session ID
 if [[ -z "$SESSION_ID" ]]; then
   export SESSION_ID=$(LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 4)
 fi
@@ -1599,7 +1599,7 @@ opus() {
     claude --model opus $@
 }
 sonet() {
-    claude --model sonet $@
+    claude --model sonnet $@
 }
 
 # Start claude, resuming session if it exists, otherwise start new.

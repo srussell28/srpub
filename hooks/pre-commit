@@ -1,4 +1,35 @@
 #!/bin/bash
-ruff check --fix .
-ruff format .
-git add -u
+# Lint/format staged python files with ruff before committing.
+# Works without conda activation: falls back to the samdev env binary,
+# since non-login shells don't have the env (or ruff) on PATH.
+
+RUFF=$(command -v ruff)
+if [ -z "$RUFF" ]; then
+    for candidate in "$HOME"/miniconda3/envs/samdev/bin/ruff \
+                     "$HOME"/anaconda3/envs/samdev/bin/ruff \
+                     /opt/homebrew/bin/ruff; do
+        if [ -x "$candidate" ]; then
+            RUFF="$candidate"
+            break
+        fi
+    done
+fi
+if [ -z "$RUFF" ]; then
+    echo "pre-commit: ruff not found on PATH or in samdev env, skipping lint" >&2
+    exit 0
+fi
+
+# Only touch files that are actually staged (git add -u here would
+# silently sweep unrelated working-tree edits into the commit).
+staged=()
+while IFS= read -r f; do
+    staged+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
+
+if [ ${#staged[@]} -eq 0 ]; then
+    exit 0
+fi
+
+"$RUFF" check --fix "${staged[@]}" || exit 1
+"$RUFF" format "${staged[@]}" || exit 1
+git add "${staged[@]}"

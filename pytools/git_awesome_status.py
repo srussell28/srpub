@@ -124,7 +124,9 @@ _COMMIT_FMT_PLAIN = '"%h  %as  %an%n   %s%n"'
 
 
 def show_sha(sha: str):
-    command = f"git --no-pager log --color=always --pretty=format:{_COMMIT_FMT} -1 {sha}"
+    command = (
+        f"git --no-pager log --color=always --pretty=format:{_COMMIT_FMT} -1 {sha}"
+    )
     return git_op_colored(command)
 
 
@@ -163,7 +165,7 @@ def show_sha_grey(sha: str):
 
 def show_sha_magenta(sha: str):
     command = (
-        f'git --no-pager log --color=always --pretty=format:'
+        f"git --no-pager log --color=always --pretty=format:"
         f'"%C(magenta)%h%Creset  %as  %an %C(yellow)%d%Creset%n   %s%n" -1 {sha}'
     )
     return git_op_colored(command)
@@ -517,7 +519,9 @@ def main():
 
     # Compute branch diff stat for display in header
     if made or fb != origin_main:
-        stat_base = main_merge_base if fb != origin_main and main_merge_base else merge_base
+        stat_base = (
+            main_merge_base if fb != origin_main and main_merge_base else merge_base
+        )
         diff_stat = branch_diff_stat(stat_base, target_ref) if stat_base else ""
     else:
         diff_stat = ""

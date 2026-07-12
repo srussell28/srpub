@@ -79,7 +79,7 @@ def term_width(buffer=3):
 def fill_line(line, width=None):
     width = width or term_width()
     fill_amt = max(0, width - len(line))
-    return line + "  " * fill_amt
+    return line + " " * fill_amt
 
 
 def flushprint(content):
@@ -189,27 +189,6 @@ def confirm_or_exception(warning=None):
 
 
 #################################################################
-# Internet Reading
-#################################################################
-
-
-def html_read_timeout(url, to):
-    try:
-        import urllib2
-
-        req = urllib2.Request(url)
-        resp = urllib2.urlopen(req, timeout=to)
-        return resp.read()
-    except Exception:
-        print("{url fail}")
-        return ""
-
-
-def html_read(url):
-    return html_read_timeout(url, 20)
-
-
-#################################################################
 # Simple logging infra
 #################################################################
 _verbose = False
@@ -230,17 +209,13 @@ def str_to_bool(value):
 
 
 plain = str_to_bool(os.getenv("SR_LOGS_PLAIN", "False"))
-color = str_to_bool(os.getenv("SR_LOGS_COLOR", "True"))
 verbose = str_to_bool(os.getenv("SR_LOGS_VERBOSE", "False"))
-log_level = logging.DEBUG
-if verbose := os.getenv("SR_LOGS_VERBOSE"):
-    log_level = logging.DEBUG if str_to_bool(verbose) else logging.INFO
 
 plain_format = "%(message)s"
 verbose_format = "[%(asctime)s]-[%(levelname)s] %(message)s"
 log_format = plain_format if plain else verbose_format
 
-logging.basicConfig(format=log_format, level=log_level)
+logging.basicConfig(format=log_format, level=logging.DEBUG if verbose else logging.INFO)
 log = logging.getLogger()
 
 #################################################################
@@ -702,28 +677,6 @@ def get_config_int(cname, default=0):
         return r
     except Exception:
         return default
-
-
-def create_fbglobal(name, val=0):
-    f = open("/tmp/" + name, "w")
-    f.write(str(val))
-    f.close()
-    for x in range(val):
-        increment_fbglobal(name)
-
-
-def get_fbglobal(name):
-    f = open("/tmp/" + name, "r")
-    res = f.read()
-    f.close()
-    return len(res)
-
-
-def increment_fbglobal(name, amt=1):
-    f = open("/tmp/" + name, "a")
-    f.write("x")
-    f.close()
-    return get_fbglobal(name)
 
 
 #################################################################

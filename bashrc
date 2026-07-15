@@ -35,8 +35,9 @@ export PYTHONPATH=${PYTHONPATH}:$SRPUB_DIR/pytools
 export PYTHONUNBUFFERED="1"
 
 # git initialization (only write if unset, so per-machine overrides stick)
-git config --global --get core.editor >/dev/null || git config --global core.editor "vim"
-git config --global --get user.name >/dev/null || git config --global user.name "Samuel Russell"
+# GIT_TERMINAL_PROMPT=0 prevents credential helpers from prompting during shell init
+GIT_TERMINAL_PROMPT=0 git config --global --get core.editor >/dev/null 2>&1 || git config --global core.editor "vim"
+GIT_TERMINAL_PROMPT=0 git config --global --get user.name >/dev/null 2>&1 || git config --global user.name "Samuel Russell"
 #git config --global user.email "foobar@foobar.foo"
 
 export KUBE_EDITOR='vim'

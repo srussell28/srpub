@@ -45,12 +45,21 @@ def try_epoch(datetime_str, quiet=False):
     return datetime.fromtimestamp(val, tz=pytz.UTC)
 
 
+def normalize_tz_abbrevs(s: str) -> str:
+    """Uppercase any trailing timezone abbreviation so dateutil's tzinfos dict matches."""
+    parts = s.rsplit(None, 1)
+    if len(parts) == 2 and parts[1].upper() in TZINFOS:
+        return parts[0] + " " + parts[1].upper()
+    return s
+
+
 def parse_and_convert(datetime_str, show_relative=True, quiet=False):
     # Try to parse the datetime string
     try:
         # Try epoch first for pure numeric input
         dt = try_epoch(datetime_str, quiet=quiet)
         if dt is None:
+            datetime_str = normalize_tz_abbrevs(datetime_str)
             # Parse the datetime - dateutil.parser handles many formats
             dt = parser.parse(datetime_str, tzinfos=TZINFOS)
 

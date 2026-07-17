@@ -271,8 +271,11 @@ def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
             if datetime.datetime.now().timestamp() - ts < ttl_seconds:
                 return data
 
-    # Get actual remote branches from server
-    ls_remote = cmd("git ls-remote --heads origin 2>/dev/null").strip()
+    # Get actual remote branches from server (GIT_TERMINAL_PROMPT=0 prevents
+    # credential prompts on machines using HTTPS remotes without stored creds)
+    ls_remote = cmd(
+        "GIT_TERMINAL_PROMPT=0 git ls-remote --heads origin 2>/dev/null"
+    ).strip()
     actual_remote = set()
     for line in ls_remote.split("\n"):
         if line and "\t" in line:

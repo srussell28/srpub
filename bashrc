@@ -921,7 +921,9 @@ with_ssh_remote() {
     local old ssh rc
     old=$(git remote get-url origin) || return 1
     # rewrite https://github.com/OWNER/REPO(.git) -> git@github.com:OWNER/REPO.git
-    ssh=$(sed -E 's#^https://github[.]com/([^/]+)/([^/]+?)([.]git)?$#git@github.com:\1/\2.git#' <<<"$old")
+    # Two-step: strip trailing .git first, then rewrite scheme — avoids non-greedy
+    # quantifiers (+?) which BSD sed (macOS) rejects in ERE mode.
+    ssh=$(sed -E 's#[.]git$##' <<<"$old" | sed -E 's#^https://github[.]com/([^/]+)/([^/]+)$#git@github.com:\1/\2.git#')
     echo "with_ssh_remote: origin $old -> $ssh" >&2
     git remote set-url origin "$ssh" || return 1
     "$@"

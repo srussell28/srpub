@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 import sys
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
-import pytz
 from dateutil import parser
 from dateutil.parser import UnknownTimezoneWarning
 
 warnings.simplefilter("error", UnknownTimezoneWarning)
+
+UTC = timezone.utc
+EASTERN = ZoneInfo("America/New_York")
 
 # Common US/UTC timezone abbreviations not recognized by dateutil by default.
 # Values are fixed UTC offsets in seconds.
@@ -34,7 +37,6 @@ def try_epoch(datetime_str, quiet=False):
             val = float(datetime_str)
         except ValueError:
             return None
-    # epoch ms if value is too large for seconds (after year 2100 in seconds)
     if val > 4_102_444_800:
         val = val / 1000.0
         if not quiet:
@@ -42,7 +44,7 @@ def try_epoch(datetime_str, quiet=False):
     else:
         if not quiet:
             print("Interpreting as epoch seconds")
-    return datetime.fromtimestamp(val, tz=pytz.UTC)
+    return datetime.fromtimestamp(val, tz=UTC)
 
 
 def normalize_tz_abbrevs(s: str) -> str:
@@ -54,39 +56,24 @@ def normalize_tz_abbrevs(s: str) -> str:
 
 
 def parse_and_convert(datetime_str, show_relative=True, quiet=False):
-    # Try to parse the datetime string
     try:
-        # Try epoch first for pure numeric input
         dt = try_epoch(datetime_str, quiet=quiet)
         if dt is None:
             datetime_str = normalize_tz_abbrevs(datetime_str)
-            # Parse the datetime - dateutil.parser handles many formats
             dt = parser.parse(datetime_str, tzinfos=TZINFOS)
-
-            # If no timezone info, assume UTC
             if dt.tzinfo is None:
                 print("Assuming input is UTC")
-                dt = pytz.UTC.localize(dt)
+                dt = dt.replace(tzinfo=UTC)
 
-        # Convert to the machine's local timezone. A no-arg astimezone() uses
-        # the system zone and is DST-correct for the given instant, so this
-        # works on any host instead of being pinned to one region.
         local_dt = dt.astimezone()
+        utc_dt = dt.astimezone(UTC)
+        eastern_dt = dt.astimezone(EASTERN)
 
-        # Convert to UTC and to US/Eastern (shown as an extra reference when the
-        # local machine isn't already on Eastern time).
-        utc_dt = dt.astimezone(pytz.UTC)
-        eastern_dt = dt.astimezone(pytz.timezone("US/Eastern"))
-
-        # Format outputs
         print("")
         epoch_s = int(utc_dt.timestamp())
         epoch_ms = int(utc_dt.timestamp() * 1000)
         print(f"Local (24h): {local_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Local (12h): {local_dt.strftime('%Y-%m-%d %I:%M:%S %p %Z')}")
-        # Skip only when the machine actually is on Eastern time. Match both
-        # offset and abbreviation so a zone that merely shares Eastern's offset
-        # right now (e.g. AST == EDT in summer) still gets the reference line.
         local_is_eastern = (
             local_dt.utcoffset() == eastern_dt.utcoffset()
             and local_dt.tzname() == eastern_dt.tzname()
@@ -98,7 +85,7 @@ def parse_and_convert(datetime_str, show_relative=True, quiet=False):
         print(f"Epoch (ms):  {epoch_ms}")
 
         if show_relative:
-            delta = int(utc_dt.timestamp() - datetime.now(pytz.UTC).timestamp())
+            delta = int(utc_dt.timestamp() - datetime.now(UTC).timestamp())
             suffix = "from now" if delta >= 0 else "ago"
             secs = abs(delta)
             d, rem = divmod(secs, 86400)
@@ -118,7 +105,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("Current Time")
         parse_and_convert(
-            str(int(datetime.now(pytz.UTC).timestamp())),
+            str(int(datetime.now(UTC).timestamp())),
             show_relative=False,
             quiet=True,
         )

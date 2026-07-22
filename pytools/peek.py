@@ -51,30 +51,14 @@ def file_size_str(n):
 # ---------------------------------------------------------------------------
 
 
-def handle_directory(path: Path):
-    entries = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
-    if not entries:
-        print("(empty directory)")
-        return
-
-    rows = []
-    for e in entries:
-        try:
-            st = e.stat()
-            size = file_size_str(st.st_size) if e.is_file() else ""
-            import datetime
-
-            mtime = datetime.datetime.fromtimestamp(st.st_mtime).strftime("%b %d %H:%M")
-        except OSError:
-            size, mtime = "?", "?"
-        name = e.name + ("/" if e.is_dir() else "")
-        rows.append((size, mtime, name, e.is_dir()))
-
-    size_w = max(len(r[0]) for r in rows)
-    for size, mtime, name, is_dir in rows:
-        color = "\033[1;34m" if is_dir else ""
-        reset = "\033[0m" if is_dir else ""
-        print(f"  {size:>{size_w}}  {mtime}  {color}{name}{reset}")
+def handle_directory(path: Path, ls_args: list):
+    cmd = ["ls"]
+    if sys.platform == "darwin":
+        cmd += ["-G"]
+    else:
+        cmd += ["--color=auto"]
+    cmd += ls_args + [str(path)]
+    run(cmd)
 
 
 def handle_markdown(path: Path):
@@ -169,7 +153,7 @@ def handle_text(path: Path, max_lines=200):
     if len(lines) > max_lines:
         for line in lines[:max_lines]:
             print(line)
-        print(f"\n  ... ({len(lines) - max_lines} more lines, use -a to show all)")
+        print(f"\n  ... ({len(lines) - max_lines} more lines, use --all to show all)")
     else:
         print(text, end="")
 
@@ -318,14 +302,13 @@ def handle_binary(path: Path):
 # ---------------------------------------------------------------------------
 
 
-def peek(path: Path, show_all: bool = False):
+def peek(path: Path, show_all: bool = False, ls_args: list = None):
     if not path.exists():
         print(f"peek: {path}: no such file or directory", file=sys.stderr)
         sys.exit(1)
 
     if path.is_dir():
-        print(f"\033[1;34m{path}/\033[0m")
-        handle_directory(path)
+        handle_directory(path, ls_args or [])
         return
 
     ext = path.suffix.lower()
@@ -377,10 +360,12 @@ def main():
         "path", nargs="?", default=".", help="File or directory to peek at"
     )
     parser.add_argument(
-        "-a", "--all", action="store_true", help="Show full content without truncation"
+        "--all",
+        action="store_true",
+        help="Show full content without truncation (files only)",
     )
-    args = parser.parse_args()
-    peek(Path(args.path), show_all=args.all)
+    args, extra = parser.parse_known_args()
+    peek(Path(args.path), show_all=args.all, ls_args=extra)
 
 
 if __name__ == "__main__":

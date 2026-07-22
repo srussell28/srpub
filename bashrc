@@ -173,6 +173,9 @@ hist() {
 # Analytics dashboard over the ~/.logs history (top commands, by-hour, aliases)
 alias logstats='$SRPUB_DIR/pytools/logstats.py'
 alias logtail='$SRPUB_DIR/pytools/logtail.py'
+alias keepawake='$SRPUB_DIR/pytools/keepawake.py'
+alias peek='$SRPUB_DIR/pytools/peek.py'
+alias k='$SRPUB_DIR/pytools/peek.py'
 
 # Disk usage analysis + reclaimable-space report (read-only; --clean to free)
 alias diskfree='$SRPUB_DIR/pytools/diskfree.py'
@@ -574,19 +577,6 @@ extract () {
            *.Z)         uncompress $1  ;;
            *.7z)        7z x $1        ;;
            *)           echo "don't know how to extract '$1'..." ;;
-       esac
-   else
-       echo "'$1' is not a valid file!"
-   fi
-}
-peek () {
-   if [ -f $1 ] ; then
-       case $1 in
-           *.tar.bz2)   tar -jtvf $1    ;;
-           *.tar.gz)    tar -ztvf $1     ;;
-           *.tar)       tar -tvf $1     ;;
-           *.zip)       unzip -l $1       ;;
-           *)           echo "don't know how to peek '$1'..." ;;
        esac
    else
        echo "'$1' is not a valid file!"

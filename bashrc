@@ -1000,12 +1000,12 @@ gbd() {
             echo "Killing tmux claude session $session_name" | yellow
             tmux kill-session -t "=$session_name"
         fi
-        # Clean up branch_sessions map
+        # Clean up branch_sessions and branch_parents maps
+        local key="${repo}/${branch}"
         local map_file="$HOME/.claude/branch_sessions"
-        if [ -f "$map_file" ]; then
-            local key="${repo}/${branch}"
-            sed -i.bak "\|^${key} |d" "$map_file"
-        fi
+        [ -f "$map_file" ] && sed -i.bak "\|^${key} |d" "$map_file"
+        local parents_file="$HOME/.claude/branch_parents"
+        [ -f "$parents_file" ] && sed -i.bak "\|^${key} |d" "$parents_file"
     fi
 }
 

@@ -25,6 +25,29 @@ session_id=$(echo "$input" | python3 -c \
     "import sys,json; d=json.load(sys.stdin); print(d.get('session_id','unknown'))" 2>/dev/null)
 [ -z "$session_id" ] && session_id="unknown"
 
+# Record branch parentage when Claude creates a new branch, so ct can auto-inherit context.
+_record_branch_parent() {
+    local tool_name cmd new_branch repo parents_file
+    tool_name=$(echo "$input" | python3 -c \
+        "import sys,json; d=json.load(sys.stdin); print(d.get('tool_name',''))" 2>/dev/null)
+    [[ "$tool_name" != "Bash" ]] && return
+    cmd=$(echo "$input" | python3 -c \
+        "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))" 2>/dev/null)
+    if [[ "$cmd" =~ git[[:space:]]+checkout[[:space:]]+-b[[:space:]]+([^[:space:]]+) ]]; then
+        new_branch="${BASH_REMATCH[1]}"
+    elif [[ "$cmd" =~ git[[:space:]]+switch[[:space:]]+-c[[:space:]]+([^[:space:]]+) ]]; then
+        new_branch="${BASH_REMATCH[1]}"
+    else
+        return
+    fi
+    repo=$(_repo_name) || return
+    parents_file="$HOME/.claude/branch_parents"
+    mkdir -p "$HOME/.claude"
+    sed -i.bak "\|^${repo}/${new_branch} |d" "$parents_file" 2>/dev/null
+    echo "${repo}/${new_branch} ${session_id}" >> "$parents_file"
+}
+_record_branch_parent
+
 _git_root() { git rev-parse --show-toplevel 2>/dev/null; }
 _lock_file() { local r; r=$(_git_root) && echo "${r}/.git/.claude-lock"; }
 _now() { date +%s; }

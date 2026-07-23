@@ -1737,6 +1737,19 @@ ct() {
         fi
     fi
 
+    # Auto-inherit parent session if this branch was spawned by another Claude session
+    local parents_file="$HOME/.claude/branch_parents"
+    if [ -z "$from_branch" ] && [ "$force_new" != "true" ] && [ -f "$parents_file" ]; then
+        local parent_sid existing_sid
+        parent_sid=$(grep "^${key} " "$parents_file" | head -n 1 | cut -d' ' -f2)
+        existing_sid=""
+        [ -f "$map_file" ] && existing_sid=$(grep "^${key} " "$map_file" | head -n 1 | cut -d' ' -f2)
+        if [ -n "$parent_sid" ] && [ -z "$existing_sid" ]; then
+            echo "Branch was spawned by another Claude session — inheriting context (use --new for blank)" | yellow
+            echo "${key} ${parent_sid}" >> "$map_file"
+        fi
+    fi
+
     sleep 0.5
     tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && claude_resume_or_new '${key}'"
 }

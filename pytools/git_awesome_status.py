@@ -5,25 +5,24 @@ import re
 import sys
 from pathlib import Path
 
-from srutils import (
-    my_email,
-    name_aliases,
-    is_windows,
-    get_term_size,
-    cmd,
-    yes_or_no,
-    DiskCache,
-    set_verbose,
-)
-
 from colorstrings import (
     blue_str,
+    bold_str,
     cyan_str,
     green_str,
     grey_str,
     magenta_str,
     red_str,
-    bold_str,
+)
+from srutils import (
+    DiskCache,
+    cmd,
+    get_term_size,
+    is_windows,
+    my_email,
+    name_aliases,
+    set_verbose,
+    yes_or_no,
 )
 
 
@@ -158,7 +157,7 @@ def show_sha_grey(sha: str):
         else:
             res = grey_str(res)
     print(res)
-    print("")
+    print()
 
 
 def show_sha_magenta(sha: str):
@@ -268,7 +267,10 @@ def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
         cached = cache.get(cache_key)
         if cached:
             ts, data = cached.get("ts", 0), cached.get("data", {})
-            if datetime.datetime.now().timestamp() - ts < ttl_seconds:
+            if (
+                datetime.datetime.now(datetime.timezone.utc).timestamp() - ts
+                < ttl_seconds
+            ):
                 return data
 
     # Get actual remote branches from server (GIT_TERMINAL_PROMPT=0 prevents
@@ -305,7 +307,11 @@ def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
 
     if cache:
         cache.set(
-            cache_key, {"ts": datetime.datetime.now().timestamp(), "data": status}
+            cache_key,
+            {
+                "ts": datetime.datetime.now(datetime.timezone.utc).timestamp(),
+                "data": status,
+            },
         )
 
     return status
@@ -320,6 +326,219 @@ def color_branch_by_remote(branch: str, text: str, remote_status: dict) -> str:
         return cyan_str(text)
     else:  # local_only
         return text  # white (default terminal color)
+
+
+###########################################################
+#     Branch Analysis (--branches)
+###########################################################
+def _compact_age(age_str: str) -> str:
+    for old, new in [
+        (" weeks ago", "w"),
+        (" week ago", "w"),
+        (" days ago", "d"),
+        (" day ago", "d"),
+        (" months ago", "mo"),
+        (" month ago", "mo"),
+        (" years ago", "y"),
+        (" year ago", "y"),
+        (" hours ago", "h"),
+        (" hour ago", "h"),
+        (" minutes ago", "m"),
+        (" minute ago", "m"),
+        (" seconds ago", "s"),
+        (" second ago", "s"),
+    ]:
+        age_str = age_str.replace(old, new)
+    return age_str
+
+
+def show_branches():
+    root = Path(cmd("git rev-parse --show-toplevel").strip())
+    repo_name = root.name
+    current = cmd("git branch --show-current").strip()
+
+    origin_head = cmd("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null").strip()
+    main_ref = (
+        origin_head.replace("refs/remotes/", "") if origin_head else "origin/main"
+    )
+
+    remote_status = get_branch_remote_status()
+
+    # Fetch open PRs indexed by head branch name
+    prs_by_branch = {}
+    pr_json = cmd(
+        "gh pr list --json headRefName,number,title,state,reviewDecision,statusCheckRollup --limit 50 2>/dev/null"
+    ).strip()
+    if pr_json and pr_json.startswith("["):
+        import json
+
+        try:
+            for pr in json.loads(pr_json):
+                branch = pr.get("headRefName", "")
+                checks = pr.get("statusCheckRollup") or []
+                if isinstance(checks, list):
+                    states = [
+                        c.get("state") or c.get("conclusion") or "" for c in checks
+                    ]
+                    if any(
+                        s in ("FAILURE", "ERROR", "failed", "error") for s in states
+                    ):
+                        ci = "fail"
+                    elif all(
+                        s in ("SUCCESS", "success", "NEUTRAL", "SKIPPED")
+                        for s in states
+                    ):
+                        ci = "pass"
+                    else:
+                        ci = "pending"
+                else:
+                    ci = ""
+                prs_by_branch[branch] = {
+                    "number": pr.get("number"),
+                    "title": pr.get("title", ""),
+                    "review": pr.get("reviewDecision") or "",
+                    "ci": ci,
+                }
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # One for-each-ref call: name, age, author
+    raw = cmd(
+        "git for-each-ref refs/heads --sort=-committerdate "
+        "'--format=%(refname:short)|%(committerdate:relative)|%(authorname)'"
+    )
+
+    branches = []
+    for line in raw.strip().split("\n"):
+        if "|" not in line:
+            continue
+        parts = line.split("|", 2)
+        branch, age_rel = parts[0], parts[1] if len(parts) > 1 else ""
+        ahead_raw = cmd(
+            f"git rev-list --count {main_ref}..{branch} 2>/dev/null"
+        ).strip()
+        try:
+            ahead = int(ahead_raw)
+        except ValueError:
+            ahead = 0
+
+        diff_stat = (
+            branch_diff_stat(
+                cmd(f"git merge-base {branch} {main_ref} 2>/dev/null").strip(), branch
+            )
+            if ahead > 0
+            else ""
+        )
+
+        # Top commit subject for unmerged branches
+        tip_subject = ""
+        if ahead > 0:
+            tip_subject = cmd(f"git log -1 --format=%s {branch} 2>/dev/null").strip()
+
+        branches.append(
+            {
+                "name": branch,
+                "age": _compact_age(age_rel),
+                "ahead": ahead,
+                "diff_stat": diff_stat,
+                "tip_subject": tip_subject,
+                "remote": remote_status.get(branch, "local_only"),
+                "pr": prs_by_branch.get(branch),
+            }
+        )
+
+    # Sort: current first, then unmerged (most commits), then merged
+    def sort_key(b):
+        if b["name"] == current:
+            return (0, -b["ahead"])
+        if b["ahead"] > 0:
+            return (1, -b["ahead"])
+        return (2, 0)
+
+    branches.sort(key=sort_key)
+
+    name_w = max((len(b["name"]) for b in branches), default=20)
+    remote_labels = {
+        "has_remote": cyan_str("pushed "),
+        "gone": red_str("gone   "),
+        "local_only": "local  ",
+    }
+    remote_sym = {"has_remote": "↑", "gone": red_str("✗"), "local_only": grey_str("·")}
+
+    print(
+        f"\n{bold_str('Branch analysis')} — {repo_name}  ({len(branches)} branches, ahead of {main_ref})\n"
+    )
+    print(
+        grey_str(
+            f"  {'':2}  {'branch':<{name_w}}  {'':7}  {'ahead':>5}  {'diff':>16}  age"
+        )
+    )
+    print(grey_str("  " + "─" * (name_w + 44)))
+
+    for b in branches:
+        marker = blue_str("* ") if b["name"] == current else "  "
+        rs = b["remote"]
+        name_col = f"{b['name']:<{name_w}}"
+        if rs == "gone":
+            name_col = red_str(name_col)
+        elif rs == "has_remote":
+            name_col = cyan_str(name_col)
+        elif b["ahead"] > 0:
+            name_col = bold_str(name_col)
+
+        rlabel = remote_labels[rs]
+        rsym = remote_sym[rs]
+
+        if b["ahead"] > 0:
+            ahead_col = green_str(f"+{b['ahead']:3} commits")
+            diff_col = grey_str(f"{b['diff_stat']:>16}") if b["diff_stat"] else " " * 16
+        else:
+            ahead_col = grey_str("    merged   ")
+            diff_col = " " * 16
+
+        age_col = grey_str(f"{b['age']:>4}")
+
+        pr = b["pr"]
+        if pr:
+            ci_sym = {"pass": green_str("✓"), "fail": red_str("✗"), "pending": "…"}.get(
+                pr["ci"], ""
+            )
+            review_sym = {
+                "APPROVED": green_str("approved"),
+                "CHANGES_REQUESTED": red_str("changes"),
+                "REVIEW_REQUIRED": "review?",
+            }.get(pr["review"], "")
+            pr_col = f"  PR #{pr['number']} {ci_sym} {review_sym}".rstrip()
+        else:
+            pr_col = ""
+
+        print(
+            f"  {marker}{name_col}  {rsym} {rlabel}  {ahead_col}  {diff_col}  {age_col}{pr_col}"
+        )
+        if b["tip_subject"]:
+            print(f"  {'':2}  {grey_str(b['tip_subject'])}")
+
+    # Summary hints
+    gone = [b["name"] for b in branches if b["remote"] == "gone" and b["ahead"] == 0]
+    local_merged = [
+        b["name"] for b in branches if b["remote"] == "local_only" and b["ahead"] == 0
+    ]
+    print()
+    if gone:
+        print(
+            red_str(
+                f"  {len(gone)} branch(es) with deleted remote + no unmerged work — safe to gbd:"
+            )
+        )
+        for name in gone:
+            print(red_str(f"    gbd {name}"))
+    if local_merged:
+        print(
+            grey_str(
+                f"  {len(local_merged)} local-only branch(es) with no unmerged commits (possibly safe to delete)"
+            )
+        )
+    print()
 
 
 ###########################################################
@@ -345,13 +564,22 @@ def main():
         required=False,
         help="Show status as if this branch were checked out",
     )
+    parser.add_argument(
+        "--branches",
+        action="store_true",
+        help="Show detailed analysis of all local branches",
+    )
     args = parser.parse_args()
 
     if args.verbose:
         set_verbose(True)
 
+    if args.branches:
+        show_branches()
+        return
+
     showall = args.all
-    rows, cols = get_term_size()
+    _rows, cols = get_term_size()
     root = Path(cmd("git rev-parse --show-toplevel").strip())
     repo_name = root.name
 
@@ -371,7 +599,7 @@ def main():
         sys.exit(0)
 
     # Print a new line to help reset coloring on Windows
-    print("")
+    print()
 
     # Determine target ref: either --branch or current HEAD
     target_ref = args.branch if args.branch else "HEAD"
@@ -561,9 +789,9 @@ def main():
             padded_branch = blue_str(padded_branch)
         elif not args.no_remote_status:
             padded_branch = color_branch_by_remote(branch, padded_branch, remote_status)
-        print(grey_str("%4s" % age) + " " + padded_branch, end="")
+        print(grey_str(f"{age:>4}") + " " + padded_branch, end="")
         if (idx + 1) % branch_cols == 0 or idx == len(branch_data_sorted) - 1:
-            print("")
+            print()
 
     if archived_branches:
         print(grey_str(age_prefix + f"{len(archived_branches)} archived branches"))
@@ -581,7 +809,7 @@ def main():
     else:
         for u in untracked:
             print(red_str(u))
-    print("")
+    print()
 
     if fb is None:
         # No remote tracking — just show recent commits

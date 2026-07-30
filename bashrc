@@ -923,12 +923,18 @@ with_ssh_remote() {
     return $rc
 }
 
+_is_personal_repo() {
+    local remote; remote=$(git remote get-url origin 2>/dev/null)
+    [[ "$remote" == *"srussell28/"* ]] || [[ "$remote" == *"srussell28:"* ]]
+}
+
 gitpush() {
     b=$(git branch --show-current)
-    if [[ "$b" == "master" || "$b" == "main" ]];
-    then
-        echo "cannot push master/main";
-        return 1;
+    if [[ "$b" == "master" || "$b" == "main" ]]; then
+        if ! _is_personal_repo; then
+            echo "cannot push master/main"
+            return 1
+        fi
     fi
 
     git_pre_push || return 1
@@ -937,10 +943,11 @@ gitpush() {
 }
 gitqpush() {
     b=$(git branch --show-current)
-    if [[ "$b" == "master" || "$b" == "main" ]];
-    then
-        echo "cannot push master/main";
-        return 1;
+    if [[ "$b" == "master" || "$b" == "main" ]]; then
+        if ! _is_personal_repo; then
+            echo "cannot push master/main"
+            return 1
+        fi
     fi
 
     echo "quick-pushing... $b"

@@ -457,23 +457,30 @@ def show_branches():
 
     branches.sort(key=sort_key)
 
+    _, cols = get_term_size()
     name_w = max((len(b["name"]) for b in branches), default=20)
-    remote_labels = {
-        "has_remote": cyan_str("pushed "),
-        "gone": red_str("gone   "),
-        "local_only": "local  ",
+
+    # Fixed-width portion: 2(marker) + name_w + 2 + 8(remote) + 2 + 10(ahead) + 2 + 16(diff) + 2 + 4(age) + 2 + 14(pr)
+    FIXED_W = 2 + name_w + 2 + 8 + 2 + 10 + 2 + 16 + 2 + 4 + 2 + 14
+    subject_w = max(0, cols - FIXED_W - 4)
+
+    remote_label = {
+        "has_remote": cyan_str("pushed  "),
+        "gone": red_str("gone    "),
+        "local_only": "local   ",
     }
     remote_sym = {"has_remote": "↑", "gone": red_str("✗"), "local_only": grey_str("·")}
 
     print(
         f"\n{bold_str('Branch analysis')} — {repo_name}  ({len(branches)} branches, ahead of {main_ref})\n"
     )
+    hdr_subject = f"  {'subject':<{subject_w}}" if subject_w > 8 else ""
     print(
         grey_str(
-            f"  {'':2}  {'branch':<{name_w}}  {'':7}  {'ahead':>5}  {'diff':>16}  age"
+            f"  {'':2}  {'branch':<{name_w}}  {'':8}  {'ahead':>10}  {'diff':>16}  {'age':>4}  {'pr':<14}{hdr_subject}"
         )
     )
-    print(grey_str("  " + "─" * (name_w + 44)))
+    print(grey_str("  " + "─" * min(cols - 4, FIXED_W + subject_w)))
 
     for b in branches:
         marker = blue_str("* ") if b["name"] == current else "  "
@@ -486,37 +493,40 @@ def show_branches():
         elif b["ahead"] > 0:
             name_col = bold_str(name_col)
 
-        rlabel = remote_labels[rs]
+        rlabel = remote_label[rs]
         rsym = remote_sym[rs]
 
         if b["ahead"] > 0:
-            ahead_col = green_str(f"+{b['ahead']:3} commits")
-            diff_col = grey_str(f"{b['diff_stat']:>16}") if b["diff_stat"] else " " * 16
+            ahead_col = green_str(f"+{b['ahead']:>3} commits")
         else:
-            ahead_col = grey_str("    merged   ")
-            diff_col = " " * 16
+            ahead_col = grey_str("    merged  ")
+
+        diff_col = grey_str(f"{b['diff_stat']:>16}") if b.get("diff_stat") else " " * 16
 
         age_col = grey_str(f"{b['age']:>4}")
 
         pr = b["pr"]
         if pr:
             ci_sym = {"pass": green_str("✓"), "fail": red_str("✗"), "pending": "…"}.get(
-                pr["ci"], ""
+                pr["ci"], " "
             )
             review_sym = {
                 "APPROVED": green_str("approved"),
                 "CHANGES_REQUESTED": red_str("changes"),
-                "REVIEW_REQUIRED": "review?",
-            }.get(pr["review"], "")
-            pr_col = f"  PR #{pr['number']} {ci_sym} {review_sym}".rstrip()
+                "REVIEW_REQUIRED": "review? ",
+            }.get(pr["review"], "        ")
+            pr_col = f"#{pr['number']:<5} {ci_sym} {review_sym}"
         else:
-            pr_col = ""
+            pr_col = " " * 14
+
+        subject_col = ""
+        if subject_w > 8 and b["tip_subject"]:
+            subj = b["tip_subject"][:subject_w]
+            subject_col = "  " + grey_str(subj)
 
         print(
-            f"  {marker}{name_col}  {rsym} {rlabel}  {ahead_col}  {diff_col}  {age_col}{pr_col}"
+            f"  {marker}{name_col}  {rsym} {rlabel}  {ahead_col}  {diff_col}  {age_col}  {pr_col}{subject_col}"
         )
-        if b["tip_subject"]:
-            print(f"  {'':2}  {grey_str(b['tip_subject'])}")
 
     # Summary hints
     gone = [b["name"] for b in branches if b["remote"] == "gone" and b["ahead"] == 0]

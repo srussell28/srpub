@@ -293,10 +293,11 @@ fi
 settings="$HOME/.claude/settings.json"
 hook_pre="bash $SRPUB_DIR/claude/hooks/pre-tool-lock.sh"
 hook_stop="bash $SRPUB_DIR/claude/hooks/stop-release-lock.sh"
-python3 - "$settings" "$hook_pre" "$hook_stop" <<'PYEOF'
+hook_post="bash $SRPUB_DIR/claude/hooks/post-tool-tab-title.sh"
+python3 - "$settings" "$hook_pre" "$hook_stop" "$hook_post" <<'PYEOF'
 import sys, json, os
 
-settings_path, hook_pre, hook_stop = sys.argv[1], sys.argv[2], sys.argv[3]
+settings_path, hook_pre, hook_stop, hook_post = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 data = {}
 if os.path.exists(settings_path):
     with open(settings_path) as f:
@@ -317,6 +318,7 @@ def ensure_hook(event, command, matcher=None):
 
 ensure_hook("PreToolUse", hook_pre, matcher="")
 ensure_hook("Stop", hook_stop)
+ensure_hook("PostToolUse", hook_post, matcher="")
 
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=2)

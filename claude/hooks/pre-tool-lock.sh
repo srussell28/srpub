@@ -53,6 +53,15 @@ _lock_file() { local r; r=$(_git_root) && echo "${r}/.git/.claude-lock"; }
 _now() { date +%s; }
 _branch() { git branch --show-current 2>/dev/null; }
 
+_set_tab_title() {
+    local title="$1"
+    if [ -n "$TMUX" ]; then
+        printf '\033Ptmux;\033\033]0;%s\007\033\\' "$title" >&2
+    else
+        printf '\033]0;%s\007' "$title" >&2
+    fi
+}
+
 _read_lock() {
     local lf="$1"
     [ -f "$lf" ] || return 1
@@ -64,6 +73,7 @@ _is_stale() { [ $(( $(_now) - $1 )) -gt $STALE_SECS ]; }
 _acquire() {
     local branch; branch=$(_branch)
     echo "$session_id $(_now) $branch" > "$lf"
+    _set_tab_title "⚙ $(_repo_name)/${branch}"
 }
 
 _has_uncommitted() {

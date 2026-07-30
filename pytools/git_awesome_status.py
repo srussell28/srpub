@@ -332,6 +332,9 @@ def color_branch_by_remote(branch: str, text: str, remote_status: dict) -> str:
 #     Branch Analysis (--branches)
 ###########################################################
 def _compact_age(age_str: str) -> str:
+    # Handle compound git ages like "1 year, 2 months ago" → "1y2mo"
+    age_str = re.sub(r"(\d+) years?, (\d+) months? ago", r"\1y\2mo", age_str)
+    age_str = re.sub(r"(\d+) years?, (\d+) weeks? ago", r"\1y\2w", age_str)
     for old, new in [
         (" weeks ago", "w"),
         (" week ago", "w"),
@@ -447,21 +450,22 @@ def show_branches():
             }
         )
 
-    # Sort: current first, then unmerged (most commits), then merged
-    def sort_key(b):
-        if b["name"] == current:
-            return (0, -b["ahead"])
-        if b["ahead"] > 0:
-            return (1, -b["ahead"])
-        return (2, 0)
-
-    branches.sort(key=sort_key)
+    # Sort: current first, preserve for-each-ref recency order for the rest
+    current_branches = [b for b in branches if b["name"] == current]
+    other_branches = [b for b in branches if b["name"] != current]
+    branches = current_branches + other_branches
 
     _, cols = get_term_size()
     name_w = max((len(b["name"]) for b in branches), default=20)
 
-    # Fixed-width portion: 2(marker) + name_w + 2 + 8(remote) + 2 + 10(ahead) + 2 + 16(diff) + 2 + 4(age) + 2 + 14(pr)
-    FIXED_W = 2 + name_w + 2 + 8 + 2 + 10 + 2 + 16 + 2 + 4 + 2 + 14
+    # Compact diff: strip "(N files)" → "+259 -76", max ~12 chars
+    def _compact_diff(diff_stat: str) -> str:
+        m = re.match(r"(\+\d+ -\d+)", diff_stat)
+        return m.group(1) if m else diff_stat
+
+    # Column widths: marker(2) name(name_w) remote(10) ahead(5) diff(12) age(6) pr(15)
+    AHEAD_W, DIFF_W, AGE_W, PR_W = 5, 12, 6, 15
+    FIXED_W = 2 + name_w + 2 + 10 + 2 + AHEAD_W + 2 + DIFF_W + 2 + AGE_W + 2 + PR_W
     subject_w = max(0, cols - FIXED_W - 4)
 
     remote_label = {
@@ -477,7 +481,7 @@ def show_branches():
     hdr_subject = f"  {'subject':<{subject_w}}" if subject_w > 8 else ""
     print(
         grey_str(
-            f"  {'':2}  {'branch':<{name_w}}  {'':8}  {'ahead':>10}  {'diff':>16}  {'age':>4}  {'pr':<14}{hdr_subject}"
+            f"  {'':2}  {'branch':<{name_w}}  {'':8}  {'ahead':>{AHEAD_W}}  {'diff':>{DIFF_W}}  {'age':>{AGE_W}}  {'pr':<{PR_W}}{hdr_subject}"
         )
     )
     print(grey_str("  " + "─" * min(cols - 4, FIXED_W + subject_w)))
@@ -497,13 +501,14 @@ def show_branches():
         rsym = remote_sym[rs]
 
         if b["ahead"] > 0:
-            ahead_col = green_str(f"+{b['ahead']:>3} commits")
+            ahead_col = green_str(f"+{b['ahead']:>{AHEAD_W - 1}}")
         else:
-            ahead_col = grey_str("    merged  ")
+            ahead_col = grey_str(f"{'—':>{AHEAD_W}}")
 
-        diff_col = grey_str(f"{b['diff_stat']:>16}") if b.get("diff_stat") else " " * 16
+        diff_str = _compact_diff(b["diff_stat"]) if b.get("diff_stat") else ""
+        diff_col = grey_str(f"{diff_str:>{DIFF_W}}") if diff_str else " " * DIFF_W
 
-        age_col = grey_str(f"{b['age']:>4}")
+        age_col = grey_str(f"{b['age']:>{AGE_W}}")
 
         pr = b["pr"]
         if pr:
@@ -511,13 +516,13 @@ def show_branches():
                 pr["ci"], " "
             )
             review_sym = {
-                "APPROVED": green_str("approved"),
-                "CHANGES_REQUESTED": red_str("changes"),
-                "REVIEW_REQUIRED": "review? ",
-            }.get(pr["review"], "        ")
-            pr_col = f"#{pr['number']:<5} {ci_sym} {review_sym}"
+                "APPROVED": green_str("appr"),
+                "CHANGES_REQUESTED": red_str("chng"),
+                "REVIEW_REQUIRED": "rev?",
+            }.get(pr["review"], "    ")
+            pr_col = f"#{pr['number']:<5} {ci_sym} {review_sym:<4}"
         else:
-            pr_col = " " * 14
+            pr_col = " " * PR_W
 
         subject_col = ""
         if subject_w > 8 and b["tip_subject"]:

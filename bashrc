@@ -1001,7 +1001,7 @@ gbd() {
 
     # Kill any tmux claude session for this branch
     if [ -n "$branch" ]; then
-        local repo=$(basename "$(git rev-parse --show-toplevel)" 2>/dev/null)
+        local repo=$(git_repo_name)
         local session_name="${repo}/${branch}"
         if tmux has-session -t "=$session_name" 2>/dev/null; then
             echo "Killing tmux claude session $session_name" | yellow
@@ -1602,6 +1602,47 @@ sonet() {
     claude --model sonnet $@
 }
 
+# Path of the main checkout, identical from the main checkout and any of its
+# worktrees. --show-toplevel would give the worktree dir (~/Chromatic-dos), which
+# keys ct sessions per-directory; --git-common-dir always points at the main .git.
+git_main_root() {
+    local common
+    common=$(git rev-parse --git-common-dir 2>/dev/null) || return 1
+    dirname "$(cd "$common" && pwd)"
+}
+
+git_repo_name() {
+    local root
+    root=$(git_main_root) || return 1
+    basename "$root"
+}
+
+# Claude stores transcripts in ~/.claude/projects/<cwd with [/._] -> ->, and
+# --resume only looks in the current cwd's dir. Since ct keys sessions by
+# repo+branch (not by directory), point a worktree's project dir at the main
+# checkout's so the same session resumes from either place.
+claude_link_worktree_projectdir() {
+    local main_root cwd projects main_slug wt_slug
+    main_root=$(git_main_root) || return 0
+    cwd=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    [ "$cwd" = "$main_root" ] && return 0   # not a worktree, nothing to do
+
+    projects="$HOME/.claude/projects"
+    main_slug=$(echo "$main_root" | sed 's/[\/._]/-/g')
+    wt_slug=$(echo "$cwd" | sed 's/[\/._]/-/g')
+    mkdir -p "$projects/$main_slug"
+
+    if [ -L "$projects/$wt_slug" ]; then
+        return 0    # already linked
+    elif [ -d "$projects/$wt_slug" ]; then
+        echo "Note: $projects/$wt_slug is a real dir with its own sessions." | yellow
+        echo "Move its contents into $main_slug/ and replace it with a symlink to share sessions." | yellow
+        return 0
+    fi
+    (cd "$projects" && ln -s "./$main_slug" "./$wt_slug") &&
+        echo "Linked worktree claude sessions to $main_slug" | yellow
+}
+
 # Start claude, resuming session if it exists, otherwise start new.
 # Stores the session mapping in ~/.claude/branch_sessions.
 # Usage: claude_resume_or_new <key>
@@ -1619,6 +1660,18 @@ claude_resume_or_new() {
         echo "Resuming claude session $claude_sid for $key" | yellow
         claude --resume "$claude_sid"
         if [ $? -ne 0 ]; then
+            # Claude stores transcripts per-cwd under ~/.claude/projects/<slug>/<sid>.jsonl
+            # and --resume only sees the current cwd's dir. If the transcript exists
+            # elsewhere (e.g. we're in a worktree and it was made in the main checkout),
+            # the session is fine -- don't delete the mapping the other dir is using.
+            local found
+            found=$(find "$HOME/.claude/projects" -name "${claude_sid}.jsonl" 2>/dev/null | head -n 1)
+            if [ -n "$found" ]; then
+                echo "Session $claude_sid exists but belongs to another directory:" | red
+                echo "  $found" | red
+                echo "Resume it from that directory, or use 'ct --new' for a fresh session here." | red
+                return 1
+            fi
             echo "Stale session, starting fresh..." | red
             sed -i.bak "\|^${key} |d" "$map_file"
             claude_sid=""
@@ -1681,7 +1734,7 @@ ct() {
         return 1
     fi
     local repo
-    repo="$(basename "$(git rev-parse --show-toplevel)")"
+    repo="$(git_repo_name)"
     local session_name="${repo}/${branch}"
 
     # Switch branch if specified and different from current
@@ -1756,6 +1809,8 @@ ct() {
             echo "${key} ${parent_sid}" >> "$map_file"
         fi
     fi
+
+    claude_link_worktree_projectdir
 
     sleep 0.5
     tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && claude_resume_or_new '${key}'"

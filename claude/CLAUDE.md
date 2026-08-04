@@ -4,6 +4,10 @@
 
 - in python, avoid local/defered imports unless they're strictly necessary or asked for
 
+- When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
+
+- Keep inline comments, PR descriptions, and function docstrings concise
+
 - when adding tests, try to be judicious about how many we add.  Adding too many tests can lead to excssive change-detection
 
 - Feature branches MUST have their upstream set to the repo's trunk, not to their own remote counterpart.  In Chromatic that means `origin/develop`; in most other repos `origin/main`.  Concretely, when creating or first pushing a feature branch use `git push origin HEAD && git branch --set-upstream-to=origin/develop` (or `origin/main`) — do NOT use plain `git push -u origin HEAD`, which sets upstream to `origin/<feature-branch>` and is wrong.  If you happen to notice an existing branch already tracking its own remote, mention it but don't auto-fix — that's a separate decision for me to make.  Rebase against the trunk by default, and push with `--force-with-lease` when a rebase has rewritten history.

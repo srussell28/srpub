@@ -13,6 +13,7 @@ from colorstrings import (
     grey_str,
     magenta_str,
     red_str,
+    yellow_str,
 )
 from srutils import (
     DiskCache,
@@ -295,7 +296,7 @@ def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
     # Classify each local branch by same-named remote status
     status = {}
     for line in cmd("git branch").strip().split("\n"):
-        branch = line.lstrip("* ").strip()
+        branch = line.lstrip("*+ ").strip()
         if not branch:
             continue
         if branch in stale_refs and branch not in actual_remote:
@@ -736,13 +737,18 @@ def main():
     else:
         common = fetch_commits_for_branch(merge_base, 15)
 
-    # Show branches
+    # Show branches ("+" prefix = checked out in another worktree)
     all_branches = cmd("git branch").strip().split("\n")
     checked_out = None
     other_branches = []
+    worktree_branches = set()
     for line in all_branches:
         if line.startswith("*"):
             checked_out = line.lstrip("* ").strip()
+        elif line.startswith("+"):
+            branch = line.lstrip("+ ").strip()
+            other_branches.append(branch)
+            worktree_branches.add(branch)
         else:
             other_branches.append(line.strip())
     # Remove the --branch target from the list (shown at top)
@@ -802,6 +808,8 @@ def main():
         padded_branch = f"%-{max_branch_len}s" % branch
         if args.branch and branch == checked_out:
             padded_branch = blue_str(padded_branch)
+        elif branch in worktree_branches:
+            padded_branch = yellow_str(padded_branch)  # checked out in a worktree
         elif not args.no_remote_status:
             padded_branch = color_branch_by_remote(branch, padded_branch, remote_status)
         print(grey_str(f"{age:>4}") + " " + padded_branch, end="")

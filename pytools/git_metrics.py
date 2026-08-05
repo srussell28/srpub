@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 
 
-from srutils import (
-    cmd,
-    parse_duration,
-    dur_to_human,
-    name_aliases,
-    GitNameMatcher,
-    looks_similar,
-)
 import argparse
 import datetime
 import operator
 import re
 import time
 
-from colorstrings import blue_str
-
+from colorstrings import blue_str, grey_str
+from srutils import (
+    GitNameMatcher,
+    cmd,
+    dur_to_human,
+    looks_similar,
+    name_aliases,
+    parse_duration,
+)
 
 MY_NAME = cmd("git config user.name") or name_aliases[0]
 
@@ -50,6 +49,11 @@ parser.add_argument(
     "--loc",
     action="store_true",
     help="Count lines of code changed instead of commits/PRs",
+)
+parser.add_argument(
+    "--order",
+    action="store_true",
+    help="List each unique author by date of first commit",
 )
 args = parser.parse_args()
 
@@ -194,10 +198,7 @@ def is_pr_commit(subject):
     """
     if "Merge pull request #" in subject:
         return True
-    if "(#" in subject and ")" in subject:
-        return True
-
-    return False
+    return "(#" in subject and ")" in subject
 
 
 loc_map = {}
@@ -298,10 +299,9 @@ for i, c in enumerate(reversed(commits)):
 
 # calculate each users rate-while-active
 rate_while_active = {}
-for key in user_active_tim:
+for key, tim in user_active_tim.items():
     cnt = all_stat.cnt[key]
-    rate = float(cnt) / user_active_tim[key].weeks()  # convert to weekly rate
-    rate_while_active[key] = rate
+    rate_while_active[key] = float(cnt) / tim.weeks()  # weekly rate
 
 sorted_x = sorted(rate_while_active.items(), key=operator.itemgetter(1), reverse=True)
 
@@ -348,7 +348,33 @@ def print_active_rate():
         )
 
 
-if args.overall:
+def print_order():
+    """Chronological timeline of each author's first commit, plus - for
+    authors inactive more than 4 months - their last commit as its own
+    grey entry in date order."""
+    stale_s = 4 * 30 * 86400
+    events = []  # (dt, kind, kname)
+    for kname, tim in user_active_tim.items():
+        events.append((tim.start, "first", kname))
+        if (dt_now - tim.end) > stale_s:
+            events.append((tim.end, "last", kname))
+    events.sort(key=lambda e: e[0])
+    print(f"\n=== Author timeline === \t ({len(user_active_tim)} unique authors)")
+    n = 0
+    for dt, kind, kname in events:
+        name = name_matcher.get_bestname(kname).title()
+        if kind == "first":
+            n += 1
+            if looks_similar(kname, args.user):
+                name = blue_str(name)
+            print(f"{n:3}. {epoch_to_date(dt)}  {name}")
+        else:
+            print(grey_str(f"   x {epoch_to_date(dt)}  {name} (last)"))
+
+
+if args.order:
+    print_order()
+elif args.overall:
     print_cnt_dict("Overall", all_stat, limit=100)
 elif args.period:
     if is_int(args.period):

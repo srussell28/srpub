@@ -352,7 +352,7 @@ def print_order():
     """Chronological timeline of each author's first commit, plus - for
     authors inactive more than 4 months - their last commit as its own
     grey entry in date order."""
-    stale_s = 4 * 30 * 86400
+    stale_s = 6 * 30 * 86400
     events = []  # (dt, kind, kname)
     for kname, tim in user_active_tim.items():
         events.append((tim.start, "first", kname))

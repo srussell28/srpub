@@ -1682,7 +1682,9 @@ claude_resume_or_new() {
         claude_sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
         echo "Starting new claude session $claude_sid for $key" | yellow
         echo "${key} ${claude_sid}" >> "$map_file"
-        claude --session-id "$claude_sid"
+        # Fresh sessions always start on opus regardless of the saved default
+        # (resumed sessions keep whatever model they were using).
+        claude --model opus --session-id "$claude_sid"
     fi
 }
 

@@ -4,7 +4,7 @@
 # The +N-M by the branch is the diff vs the trunk merge-base; "sess" is what
 # this Claude session has written (cumulative, unaffected by commits).
 input=$(cat)
-model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0
+model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0 transcript=""
 eval "$(echo "$input" | jq -r '@sh "
   model=\(.model.display_name // "?")
   effort=\(.effort.level // "")
@@ -13,6 +13,7 @@ eval "$(echo "$input" | jq -r '@sh "
   adds=\(.cost.total_lines_added // 0)
   dels=\(.cost.total_lines_removed // 0)
   rl=\(.rate_limits.five_hour.used_percentage // 0)
+  transcript=\(.transcript_path // "")
 "' 2>/dev/null)"
 # Guard against non-numeric values reaching the arithmetic tests below
 [[ $adds =~ ^[0-9]+$ ]] || adds=0
@@ -62,6 +63,44 @@ printf ' \033[90m|\033[0m \033[%sm5h %s%%\033[0m' "$c" "$pct"
 if [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
     printf ' \033[90m|\033[0m \033[90msess\033[0m \033[32m+%s\033[0m\033[31m-%s\033[0m' \
         "$adds" "$dels"
+fi
+
+# What Claude is doing RIGHT NOW: the transcript is written incrementally, so
+# a tool_use with no matching tool_result yet is the in-flight call. Beats the
+# generic "Pondering..." spinner. Nothing renders when idle.
+# Pair with "refreshInterval": 2 in settings.json so the timer ticks.
+if [ -n "$transcript" ] && [ -f "$transcript" ]; then
+    # An in-flight call is by definition the newest thing in the file, so a
+    # tail keeps this O(1) as the transcript grows.
+    busy=$(tail -400 "$transcript" 2>/dev/null | jq -rs '
+        (map(select(.type=="user") | .message.content?
+             | if type=="array" then .[] else empty end
+             | select(type=="object" and .type=="tool_result") | .tool_use_id) | unique) as $done
+        | map(select(.type=="assistant")
+              | .timestamp as $ts | .message.content?
+              | if type=="array" then .[] else empty end
+              | select(.type=="tool_use") | {id, name, ts:$ts, i:.input})
+        | map(select(.id as $i | $done | index($i) | not))
+        | last
+        | select(.)
+        | [ .ts,
+            (if .name=="Agent" then (.i.subagent_type // "agent") else .name end),
+            ((.i.description // .i.command // .i.file_path // .i.pattern // .i.query // "")
+             | tostring | gsub("\\s+"; " ") | .[0:70])
+          ] | @tsv' 2>/dev/null)
+    if [ -n "$busy" ]; then
+        IFS=$'\t' read -r bts bname barg <<<"$busy"
+        start=$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${bts%%.*}" +%s 2>/dev/null ||
+            date -u -d "${bts%%.*}" +%s 2>/dev/null)
+        el=""
+        if [ -n "$start" ]; then
+            s=$(($(date +%s) - start))
+            [ "$s" -ge 0 ] && { [ "$s" -ge 60 ] && el=" $((s / 60))m$((s % 60))s" || el=" ${s}s"; }
+        fi
+        printf '\n\033[35m◐ %s\033[0m' "$bname"
+        [ -n "$barg" ] && printf '\033[90m: %s\033[0m' "$barg"
+        printf '\033[90m%s\033[0m' "$el"
+    fi
 fi
 
 exit 0  # never fail: a nonzero exit makes Claude Code drop the status line

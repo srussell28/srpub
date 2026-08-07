@@ -1,6 +1,8 @@
 #!/bin/bash
 # Claude Code status line:
-#   ~/path | repo:branch +adds-dels | model (effort) | ctx NN% | 5h NN%
+#   ~/path | repo:branch +N-M | model (effort) | ctx NN% | 5h NN% | sess +N-M
+# The +N-M by the branch is the diff vs the trunk merge-base; "sess" is what
+# this Claude session has written (cumulative, unaffected by commits).
 input=$(cat)
 model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0
 eval "$(echo "$input" | jq -r '@sh "
@@ -26,9 +28,18 @@ printf '%s' "$path"
 [ -n "$branch" ] && printf ' \033[90m|\033[0m \033[32m%s%s\033[0m' \
     "${repo:+$repo:}" "$branch"
 
-# Lines changed this session, next to the branch they were made on
-if [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
-    printf ' \033[32m+%s\033[0m\033[31m-%s\033[0m' "$adds" "$dels"
+# Branch diff vs the trunk merge-base (survives commits, unlike session lines)
+if [ -n "$branch" ]; then
+    for t in origin/main origin/master origin/develop; do
+        base=$(git -C "$dir" merge-base HEAD "$t" 2>/dev/null) && break
+    done
+    if [ -n "$base" ]; then
+        read -r bi bd < <(git -C "$dir" diff --numstat "$base" 2>/dev/null |
+            awk '{a+=$1; d+=$2} END {print a+0, d+0}')
+        if [ "${bi:-0}" -gt 0 ] || [ "${bd:-0}" -gt 0 ]; then
+            printf ' \033[32m+%s\033[0m\033[31m-%s\033[0m' "$bi" "$bd"
+        fi
+    fi
 fi
 
 printf ' \033[90m|\033[0m \033[36m%s\033[0m' "$model"
@@ -46,5 +57,11 @@ fi
 pct=${rl%.*}
 if [ "$pct" -lt 50 ]; then c=32; elif [ "$pct" -lt 80 ]; then c=33; else c=31; fi
 printf ' \033[90m|\033[0m \033[%sm5h %s%%\033[0m' "$c" "$pct"
+
+# Lines this session has written (cumulative; unaffected by commits)
+if [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
+    printf ' \033[90m|\033[0m \033[90msess\033[0m \033[32m+%s\033[0m\033[31m-%s\033[0m' \
+        "$adds" "$dels"
+fi
 
 exit 0  # never fail: a nonzero exit makes Claude Code drop the status line

@@ -23,6 +23,9 @@ else
         SRPUB_DIR="$HOME/srpub"  # default fallback
     fi
 fi
+# Export so subshells (and functions like gs that expand it at call time)
+# don't resolve it to an empty string.
+export SRPUB_DIR
 
 export PATH=${PATH}:$HOME/bin
 export PATH=${PATH}:$HOME/scripts

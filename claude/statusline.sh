@@ -4,7 +4,7 @@
 # The +N-M by the branch is the diff vs the trunk merge-base; "sess" is what
 # this Claude session has written (cumulative, unaffected by commits).
 input=$(cat)
-model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0 transcript=""
+model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0
 eval "$(echo "$input" | jq -r '@sh "
   model=\(.model.display_name // "?")
   effort=\(.effort.level // "")
@@ -13,7 +13,6 @@ eval "$(echo "$input" | jq -r '@sh "
   adds=\(.cost.total_lines_added // 0)
   dels=\(.cost.total_lines_removed // 0)
   rl=\(.rate_limits.five_hour.used_percentage // 0)
-  transcript=\(.transcript_path // "")
 "' 2>/dev/null)"
 # Guard against non-numeric values reaching the arithmetic tests below
 [[ $adds =~ ^[0-9]+$ ]] || adds=0
@@ -63,54 +62,6 @@ printf ' \033[90m|\033[0m \033[%sm5h %s%%\033[0m' "$c" "$pct"
 if [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
     printf ' \033[90m|\033[0m \033[90msess\033[0m \033[32m+%s\033[0m\033[31m-%s\033[0m' \
         "$adds" "$dels"
-fi
-
-# What Claude is doing RIGHT NOW: the transcript is written incrementally, so
-# a tool_use with no matching tool_result yet is the in-flight call. Beats the
-# generic "Pondering..." spinner. Nothing renders when idle.
-# Pair with "refreshInterval": 2 in settings.json so the timer ticks.
-if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-    # An in-flight call is by definition the newest thing in the file, so a
-    # tail keeps this O(1) as the transcript grows.
-    # An unmatched tool_use is a running call. If there is none but the newest
-    # record is a thinking block, Claude is reasoning - the CoT text itself is
-    # never returned by the API (thinking.display defaults to "omitted", so the
-    # blocks are empty), but the elapsed time still beats a bare spinner.
-    busy=$(tail -400 "$transcript" 2>/dev/null | jq -rs '
-        (map(select(.type=="user") | .message.content?
-             | if type=="array" then .[] else empty end
-             | select(type=="object" and .type=="tool_result") | .tool_use_id) | unique) as $done
-        | (map(select(.type=="assistant")
-              | .timestamp as $ts | .message.content?
-              | if type=="array" then .[] else empty end
-              | select(.type=="tool_use") | {id, name, ts:$ts, i:.input})
-           | map(select(.id as $i | $done | index($i) | not)) | last) as $tool
-        | (map(select(.type=="assistant" and (.message.content? // []
-               | map(.type) | index("thinking")))) | last) as $think
-        | (map(select(.type=="assistant" or .type=="user")) | last) as $newest
-        | if $tool then
-            [ $tool.ts,
-              (if $tool.name=="Agent" then ($tool.i.subagent_type // "agent") else $tool.name end),
-              (($tool.i.description // $tool.i.command // $tool.i.file_path
-                // $tool.i.pattern // $tool.i.query // "")
-               | tostring | gsub("\\s+"; " ") | .[0:70]) ]
-          elif ($think and $newest and $think.timestamp == $newest.timestamp) then
-            [ $think.timestamp, "thinking", "" ]
-          else empty end
-        | @tsv' 2>/dev/null)
-    if [ -n "$busy" ]; then
-        IFS=$'\t' read -r bts bname barg <<<"$busy"
-        start=$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${bts%%.*}" +%s 2>/dev/null ||
-            date -u -d "${bts%%.*}" +%s 2>/dev/null)
-        el=""
-        if [ -n "$start" ]; then
-            s=$(($(date +%s) - start))
-            [ "$s" -ge 0 ] && { [ "$s" -ge 60 ] && el=" $((s / 60))m$((s % 60))s" || el=" ${s}s"; }
-        fi
-        printf '\n\033[35m◐ %s\033[0m' "$bname"
-        [ -n "$barg" ] && printf '\033[90m: %s\033[0m' "$barg"
-        printf '\033[90m%s\033[0m' "$el"
-    fi
 fi
 
 exit 0  # never fail: a nonzero exit makes Claude Code drop the status line

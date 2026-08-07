@@ -72,22 +72,32 @@ fi
 if [ -n "$transcript" ] && [ -f "$transcript" ]; then
     # An in-flight call is by definition the newest thing in the file, so a
     # tail keeps this O(1) as the transcript grows.
+    # An unmatched tool_use is a running call. If there is none but the newest
+    # record is a thinking block, Claude is reasoning - the CoT text itself is
+    # never returned by the API (thinking.display defaults to "omitted", so the
+    # blocks are empty), but the elapsed time still beats a bare spinner.
     busy=$(tail -400 "$transcript" 2>/dev/null | jq -rs '
         (map(select(.type=="user") | .message.content?
              | if type=="array" then .[] else empty end
              | select(type=="object" and .type=="tool_result") | .tool_use_id) | unique) as $done
-        | map(select(.type=="assistant")
+        | (map(select(.type=="assistant")
               | .timestamp as $ts | .message.content?
               | if type=="array" then .[] else empty end
               | select(.type=="tool_use") | {id, name, ts:$ts, i:.input})
-        | map(select(.id as $i | $done | index($i) | not))
-        | last
-        | select(.)
-        | [ .ts,
-            (if .name=="Agent" then (.i.subagent_type // "agent") else .name end),
-            ((.i.description // .i.command // .i.file_path // .i.pattern // .i.query // "")
-             | tostring | gsub("\\s+"; " ") | .[0:70])
-          ] | @tsv' 2>/dev/null)
+           | map(select(.id as $i | $done | index($i) | not)) | last) as $tool
+        | (map(select(.type=="assistant" and (.message.content? // []
+               | map(.type) | index("thinking")))) | last) as $think
+        | (map(select(.type=="assistant" or .type=="user")) | last) as $newest
+        | if $tool then
+            [ $tool.ts,
+              (if $tool.name=="Agent" then ($tool.i.subagent_type // "agent") else $tool.name end),
+              (($tool.i.description // $tool.i.command // $tool.i.file_path
+                // $tool.i.pattern // $tool.i.query // "")
+               | tostring | gsub("\\s+"; " ") | .[0:70]) ]
+          elif ($think and $newest and $think.timestamp == $newest.timestamp) then
+            [ $think.timestamp, "thinking", "" ]
+          else empty end
+        | @tsv' 2>/dev/null)
     if [ -n "$busy" ]; then
         IFS=$'\t' read -r bts bname barg <<<"$busy"
         start=$(date -j -u -f "%Y-%m-%dT%H:%M:%S" "${bts%%.*}" +%s 2>/dev/null ||

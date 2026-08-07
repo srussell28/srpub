@@ -289,15 +289,16 @@ if [ "$found_skill" = false ]; then
     echo "No skills in repo yet (add claude/skills/<name>/SKILL.md)."
 fi
 
-# Install Claude Code hooks into ~/.claude/settings.json
+# Install Claude Code hooks and status line into ~/.claude/settings.json
 settings="$HOME/.claude/settings.json"
 hook_pre="bash $SRPUB_DIR/claude/hooks/pre-tool-lock.sh"
 hook_stop="bash $SRPUB_DIR/claude/hooks/stop-release-lock.sh"
 hook_post="bash $SRPUB_DIR/claude/hooks/post-tool-tab-title.sh"
-python3 - "$settings" "$hook_pre" "$hook_stop" "$hook_post" <<'PYEOF'
+statusline="bash $SRPUB_DIR/claude/statusline.sh"
+python3 - "$settings" "$hook_pre" "$hook_stop" "$hook_post" "$statusline" <<'PYEOF'
 import sys, json, os
 
-settings_path, hook_pre, hook_stop, hook_post = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+settings_path, hook_pre, hook_stop, hook_post, statusline = sys.argv[1:6]
 data = {}
 if os.path.exists(settings_path):
     with open(settings_path) as f:
@@ -320,10 +321,12 @@ ensure_hook("PreToolUse", hook_pre, matcher="")
 ensure_hook("Stop", hook_stop)
 ensure_hook("PostToolUse", hook_post, matcher="")
 
+data["statusLine"] = {"type": "command", "command": statusline, "padding": 0}
+
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
-print(f"Claude hooks installed in {settings_path}")
+print(f"Claude hooks + status line installed in {settings_path}")
 PYEOF
 
 # 8. Configure git hooks

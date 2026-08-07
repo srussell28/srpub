@@ -1,0 +1,17 @@
+{
+  "display": {
+    "showContext": false,
+    "showUsage": false,
+    "showModel": false,
+    "showProject": false,
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true
+  },
+  "lineLayout": "expanded",
+  "elementOrder": [
+    "tools",
+    "agents",
+    "todos"
+  ]
+}

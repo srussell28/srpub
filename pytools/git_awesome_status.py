@@ -169,6 +169,19 @@ def show_sha_magenta(sha: str):
     return git_op_colored(command)
 
 
+def shared_repo_name() -> str:
+    """Repo name that is identical across all worktrees of the same repo.
+
+    --show-toplevel gives the worktree's own dir, so keying caches on it makes
+    each worktree see a different archive list. --git-common-dir always points
+    at the primary .git, whose parent is the real repo.
+    """
+    common = cmd("git rev-parse --git-common-dir").strip()
+    if common:
+        return Path(common).resolve().parent.name
+    return Path(cmd("git rev-parse --show-toplevel").strip()).name
+
+
 def branch_diff_stat(base_sha: str, tip_ref: str) -> str:
     """Return a compact '+N -M (K files)' string for the diff between base and tip."""
     raw = cmd(f"git diff --shortstat {base_sha}..{tip_ref}").strip()
@@ -357,8 +370,7 @@ def _compact_age(age_str: str) -> str:
 
 
 def show_branches():
-    root = Path(cmd("git rev-parse --show-toplevel").strip())
-    repo_name = root.name
+    repo_name = shared_repo_name()
     current = cmd("git branch --show-current").strip()
 
     origin_head = cmd("git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null").strip()
@@ -596,10 +608,9 @@ def main():
 
     showall = args.all
     _rows, cols = get_term_size()
-    root = Path(cmd("git rev-parse --show-toplevel").strip())
-    repo_name = root.name
+    repo_name = shared_repo_name()
 
-    # Initialize cache
+    # Initialize cache (shared across worktrees of the same repo)
     cache = DiskCache(f"git_status_{repo_name}", verbose=args.verbose)
 
     # Check git config if not done before

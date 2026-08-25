@@ -1033,7 +1033,8 @@ gl() {
 function gits() {
     $SRPUB_DIR/pytools/git_awesome_status.py $@
 }
-alias gitmine="git log --format=short --author='Russell'"
+# Same commit format as gs (short sha, date, author, decorations, subject)
+alias gitmine="git log --format='%C(green)%h%C(reset)  %as  %C(blue)%an%C(reset)%C(yellow)%d%C(reset)%n   %s%n' --author='Russell'"
 
 gittrack() {
     if [ -z "$1" ]; then

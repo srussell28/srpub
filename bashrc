@@ -1697,6 +1697,7 @@ ct() {
     local branch_arg=""
     local from_branch=""
     local resume_sid=""
+    local ephemeral=false
 
     # Parse args; use positional-param slice so --from/--resume can consume the next token.
     # ${@:i:1} is 1-based and works in both bash and zsh (unlike C-style array indexing).
@@ -1705,6 +1706,7 @@ ct() {
         local arg="${@:$i:1}"
         case "$arg" in
             --new) force_new=true ;;
+            --ephemeral|-e) ephemeral=true ;;
             --from)
                 (( i++ ))
                 from_branch="${@:$i:1}" ;;
@@ -1712,13 +1714,15 @@ ct() {
                 (( i++ ))
                 resume_sid="${@:$i:1}" ;;
             --help|-h)
-                echo "Usage: ct [branch] [--new] [--from <branch>] [--resume <session-id>]"
+                echo "Usage: ct [branch] [--new] [--ephemeral [name]] [--from <branch>] [--resume <session-id>]"
                 echo ""
                 echo "  Opens (or attaches to) a tmux+claude session for a git branch."
                 echo "  Defaults to the current branch if none specified."
                 echo ""
                 echo "Options:"
                 echo "  --new                  Kill any existing session and start fresh"
+                echo "  --ephemeral, -e [name] Session tied to no branch (no checkout, no inherit)."
+                echo "                         tmux session is <repo>/~<name>; unnamed gets ~scratchN."
                 echo "  --from <branch>        Inherit claude context from <branch> (use after merging)"
                 echo "  --resume <session-id>  Resume a specific claude session by ID"
                 echo ""
@@ -1726,6 +1730,7 @@ ct() {
                 echo "  ct                                  # attach/open session for current branch"
                 echo "  ct sam/my-feature                   # switch to branch and open its session"
                 echo "  ct --new                            # start fresh, discarding existing session"
+                echo "  ct --ephemeral followup-memory      # branch-independent scratch session"
                 echo "  ct sam/new --from sam/old           # new branch, carry over old branch's context"
                 echo "  ct --resume abc-123-def             # wire a specific session ID to current branch"
                 return 0 ;;
@@ -1733,6 +1738,42 @@ ct() {
         esac
         (( i++ ))
     done
+
+    # Ephemeral: tied to a name instead of a branch, so it survives checkouts
+    # and never inherits/writes branch session state.
+    if [ "$ephemeral" = true ]; then
+        local repo name key session_name
+        repo="$(git_repo_name)"
+        [ -z "$repo" ] && repo="$(basename "$PWD")"
+        # Unnamed: generate a unique one so repeat calls don't collide
+        name="$branch_arg"
+        if [ -z "$name" ]; then
+            local n=1
+            while tmux has-session -t "=${repo}/~scratch${n}" 2>/dev/null; do
+                n=$((n + 1))
+            done
+            name="scratch${n}"
+        fi
+        session_name="${repo}/~${name}"
+        key="${repo}/~${name}"
+
+        if [ "$force_new" = true ] && tmux has-session -t "=$session_name" 2>/dev/null; then
+            echo "Killing existing tmux session $session_name" | yellow
+            tmux kill-session -t "=$session_name"
+            sed -i.bak "\|^${key} |d" "$HOME/.claude/branch_sessions" 2>/dev/null
+        fi
+        if tmux has-session -t "=$session_name" 2>/dev/null; then
+            echo "Attaching to existing tmux session $session_name" | yellow
+            sleep 0.5
+            tmux attach -t "=$session_name"
+            return
+        fi
+
+        claude_link_worktree_projectdir
+        sleep 0.5
+        tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && claude_resume_or_new '${key}'"
+        return
+    fi
 
     local branch="${branch_arg:-$(git branch --show-current)}"
     if [ -z "$branch" ]; then

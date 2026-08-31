@@ -6,9 +6,9 @@
 
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
-- Keep inline comments, PR descriptions, and function docstrings concise
+- Keep inline comments, PR descriptions, and function docstrings concise.  Avoid adding inline comments that describe the logic behind a change being made, that sort of thing belongs in the PR description, the inline comment should only be whats needed for someone to understand the current state of the code after merge.
 
-- when adding tests, try to be judicious about how many we add.  Adding too many tests can lead to excssive change-detection
+- when adding tests, try to be judicious about how many we add.  Aim to add unit tests at a middle-level, where we're covering meainigful amounts of logic/code, but not quite as high-level as an integration test woudl be.  Adding too many tests can lead to excssive change-detection.
 
 - Feature branches MUST have their upstream set to the repo's trunk, not to their own remote counterpart.  In Chromatic that means `origin/develop`; in most other repos `origin/main`.  Concretely, when creating or first pushing a feature branch use `git push origin HEAD && git branch --set-upstream-to=origin/develop` (or `origin/main`) — do NOT use plain `git push -u origin HEAD`, which sets upstream to `origin/<feature-branch>` and is wrong.  If you happen to notice an existing branch already tracking its own remote, mention it but don't auto-fix — that's a separate decision for me to make.  Rebase against the trunk by default, and push with `--force-with-lease` when a rebase has rewritten history.
 

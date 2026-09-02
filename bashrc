@@ -1235,12 +1235,22 @@ act() {
             fi
         done
 
-        if [ -d "$dir/bazel-venvs" ]; then
-            echo "Found bazel-venvs in $dir/bazel-venvs"
-            local venv=$(ls -1 "$dir/bazel-venvs" | head -1)
-            if [ -n "$venv" ] && [ -f "$dir/bazel-venvs/$venv/bin/activate" ]; then
+        # A git worktree has no bazel-venvs of its own; the venv lives in the
+        # primary checkout, which git records as the common dir.
+        local venv_home="$dir"
+        if [ ! -d "$venv_home/bazel-venvs" ] && [ -e "$dir/.git" ]; then
+            local common=$(git -C "$dir" rev-parse --git-common-dir 2>/dev/null)
+            case "$common" in
+                /*) venv_home="${common%/.git}" ;;
+            esac
+        fi
+
+        if [ -d "$venv_home/bazel-venvs" ]; then
+            echo "Found bazel-venvs in $venv_home/bazel-venvs"
+            local venv=$(ls -1 "$venv_home/bazel-venvs" | head -1)
+            if [ -n "$venv" ] && [ -f "$venv_home/bazel-venvs/$venv/bin/activate" ]; then
                 echo "Activating venv: $venv"
-                source "$dir/bazel-venvs/$venv/bin/activate"
+                source "$venv_home/bazel-venvs/$venv/bin/activate"
                 return
             fi
             return 0

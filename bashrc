@@ -857,6 +857,42 @@ _worktree_path_for_branch() {
     '
 }
 
+_bazel_output_base_for_path() {
+    # Print the bazel output base for a workspace path, if bazel made one.
+    # Bazel names it md5(<workspace path>), so a worktree gets its own.
+    local ws="$1" hash base
+    hash=$(printf '%s' "$ws" | md5 -q 2>/dev/null || printf '%s' "$ws" | md5sum | cut -d' ' -f1)
+    [ -n "$hash" ] || return 0
+    # each candidate quoted separately: bash and zsh split ${x:-a b} differently
+    for base in "$BAZEL_OUTPUT_USER_ROOT/$hash" \
+                "$HOME/Library/Caches/bazel/_bazel_$USER/$hash" \
+                "$HOME/.cache/bazel/_bazel_$USER/$hash"; do
+        # only claim it if bazel recorded this exact workspace there
+        if [ "$(sed -n '1s/^WORKSPACE: //p' "$base/README" 2>/dev/null)" = "$ws" ]; then
+            echo "$base"
+            return 0
+        fi
+    done
+    return 0
+}
+
+_bazel_remove_output_base() {
+    # Shut down the idle server and drop the output base for a dead worktree.
+    local ob="$1"
+    [ -n "$ob" ] && [ -d "$ob" ] || return 0
+    local pid
+    pid=$(cat "$ob/server/server.pid.txt" 2>/dev/null)
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        echo "shutting down bazel server pid=$pid" | yellow
+        kill "$pid" 2>/dev/null
+    fi
+    echo "removing bazel output base $ob" | yellow
+    # rename then unlink in the background: these trees are huge and slow to
+    # walk, and bazel leaves output dirs read-only so rm needs u+w to descend
+    mv "$ob" "$ob.deleting-$$" 2>/dev/null \
+        && ( (chmod -R u+rwX "$ob.deleting-$$" 2>/dev/null; rm -rf "$ob.deleting-$$") >/dev/null 2>&1 & )
+}
+
 primary() {
     # cd to the primary checkout. With no args, check out the current branch there.
     # With a branch arg, check out that branch on the primary checkout.
@@ -994,6 +1030,10 @@ gbd() {
         local wt_path
         wt_path=$(_worktree_path_for_branch "$branch")
         if [ -n "$wt_path" ]; then
+            # capture this before the worktree goes away: the output base is
+            # keyed off the worktree path, so afterwards it is unidentifiable
+            local wt_output_base
+            wt_output_base=$(_bazel_output_base_for_path "$wt_path")
             echo "removing worktree at $wt_path for branch '$branch'" | yellow
             if ! git worktree remove --force "$wt_path" 2>/dev/null; then
                 # Worktree dir is gone/corrupt (e.g. a stale Claude scratchpad).
@@ -1001,6 +1041,9 @@ gbd() {
                 echo "worktree remove failed, pruning stale ref" | yellow
                 git worktree prune
             fi
+            # only if the tree is really gone: wt_path can be the primary
+            # checkout (git worktree list includes it), which must keep its cache
+            [ -d "$wt_path" ] || _bazel_remove_output_base "$wt_output_base"
         fi
     fi
 

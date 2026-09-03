@@ -443,15 +443,21 @@ _have_fzf() { command -v fzf >/dev/null 2>&1; }
 # Resolve one candidate from stdin that matches query $1 (substring, like the
 # old grep). 0 matches -> return 1; exactly 1 -> echo it; >1 -> interactive fzf
 # if installed, else the old first-match behavior.
+# $2 is the shortest query allowed to resolve without confirmation (default 4):
+# a shorter query always opens the picker, even when it matches only one line.
 _pick_match() {
-    local query="$1"
-    local matches
+    local query="$1" min_auto="${2:-4}"
+    local matches count
     matches=$(grep -i -- "$query" 2>/dev/null)
     [ -z "$matches" ] && return 1
-    if [ "$(printf '%s\n' "$matches" | grep -c .)" -eq 1 ]; then
+    count=$(printf '%s\n' "$matches" | grep -c .)
+    if [ "$count" -eq 1 ] && [ "${#query}" -ge "$min_auto" ]; then
         printf '%s\n' "$matches"
     elif _have_fzf; then
         printf '%s\n' "$matches" | fzf --height=40% --reverse --query="$query"
+    elif [ "${#query}" -lt "$min_auto" ]; then
+        echo "'$query' is too short to auto-match; type more of the name" >&2
+        return 1
     else
         printf '%s\n' "$matches" | head -n 1
     fi
@@ -975,10 +981,12 @@ gbd() {
     if ! git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
         local matched
         matched=$(git branch | grep -v "^\*" | sed 's/^[+ ]*//' | _pick_match "$branch")
-        if [ -n "$matched" ]; then
-            echo "auto-matching branch $matched" | yellow
-            branch="$matched"
+        if [ -z "$matched" ]; then
+            echo "no branch matching '$branch'" | red
+            return 1
         fi
+        echo "auto-matching branch $matched" | yellow
+        branch="$matched"
     fi
 
     # If branch has a worktree, remove it first.

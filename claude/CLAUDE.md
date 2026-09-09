@@ -4,6 +4,8 @@
 
 - in python, avoid local/defered imports unless they're strictly necessary or asked for
 
+- always use color-blind friendly reds/greens when desining UIs or tables or such
+
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
 - Keep inline comments, PR descriptions, and function docstrings concise.  Avoid adding inline comments that describe the logic behind a change being made, that sort of thing belongs in the PR description, the inline comment should only be whats needed for someone to understand the current state of the code after merge.
@@ -19,3 +21,5 @@
 - **Worktrees**: Git worktrees are permitted for parallel development on separate branches.
 
 - **Repo lock**: Because multiple Claude sessions can run concurrently against the same checkout (one per tmux window), a file-based lock lives at `.git/.claude-lock`. A PreToolUse hook (`claude/hooks/pre-tool-lock.sh`) acquires/refreshes this lock on every tool call so only one session edits files at a time. If the hook blocks a tool call, it means another session is actively working — the hook will wait up to 60s for it to finish, then stop and ask. The lock also records which branch was active when it was acquired; if the branch changes mid-session the hook blocks and asks for confirmation (matching the manual branch-check rule above). The lock expires automatically after 5 minutes of inactivity, so a crashed session never permanently blocks. To force-clear a stale lock: `rm $(git rev-parse --git-dir)/.claude-lock`.
+
+- Colors for status/semantic red-green in anything I build (dashboards, artifacts, plots): reuse the colorblind-safe palette from the hub frontend, `chromatic/ml/apps/hub/frontend/src/index.css` (`--run-*`). Green = `--run-3` (#1baf7a light / #199e70 dark), red = `--run-8` (#b0413e / #c9524f), blue = `--run-1` (#2a78d6 / #3987e5), orange = `--run-2` (#eb6834 / #d95926). Don't invent a new red/green pair.

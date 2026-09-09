@@ -1753,11 +1753,48 @@ claude_resume_or_new() {
     fi
 }
 
+# Same idea as claude_resume_or_new, for codex. Codex has no --session-id to
+# pre-assign, so the id is captured from its session index after the TUI exits.
+# Usage: codex_resume_or_new <key>
+codex_resume_or_new() {
+    local key="$1"
+    local map_file="$HOME/.claude/codex_sessions"
+    local index="$HOME/.codex/session_index.jsonl"
+    mkdir -p "$HOME/.claude"
+
+    local sid=""
+    [ -f "$map_file" ] && sid=$(grep "^${key} " "$map_file" | head -n 1 | cut -d' ' -f2)
+
+    if [ -n "$sid" ]; then
+        echo "Resuming codex session $sid for $key" | yellow
+        codex resume "$sid" || {
+            echo "Stale session, starting fresh..." | red
+            sed -i.bak "\|^${key} |d" "$map_file"
+            sid=""
+            codex
+        }
+    else
+        echo "Starting new codex session for $key" | yellow
+        codex
+    fi
+
+    # Record the most recently updated session so the next launch resumes it.
+    if [ -f "$index" ]; then
+        local newest
+        newest=$(jq -rs 'max_by(.updated_at) | .id' "$index" 2>/dev/null)
+        if [ -n "$newest" ] && [ "$newest" != "null" ] && [ "$newest" != "$sid" ]; then
+            sed -i.bak "\|^${key} |d" "$map_file" 2>/dev/null
+            echo "${key} ${newest}" >> "$map_file"
+        fi
+    fi
+}
+
 ct() {
     local force_new=false
     local branch_arg=""
     local from_branch=""
     local resume_sid=""
+    local agent="claude"
     local ephemeral=false
 
     # Parse args; use positional-param slice so --from/--resume can consume the next token.
@@ -1767,6 +1804,7 @@ ct() {
         local arg="${@:$i:1}"
         case "$arg" in
             --new) force_new=true ;;
+            --codex) agent="codex" ;;
             --ephemeral|-e) ephemeral=true ;;
             --from)
                 (( i++ ))
@@ -1775,13 +1813,14 @@ ct() {
                 (( i++ ))
                 resume_sid="${@:$i:1}" ;;
             --help|-h)
-                echo "Usage: ct [branch] [--new] [--ephemeral [name]] [--from <branch>] [--resume <session-id>]"
+                echo "Usage: ct [branch] [--new] [--codex] [--ephemeral [name]] [--from <branch>] [--resume <session-id>]"
                 echo ""
                 echo "  Opens (or attaches to) a tmux+claude session for a git branch."
                 echo "  Defaults to the current branch if none specified."
                 echo ""
                 echo "Options:"
                 echo "  --new                  Kill any existing session and start fresh"
+                echo "  --codex                Run codex instead of claude (session name gets a :codex suffix)"
                 echo "  --ephemeral, -e [name] Session tied to no branch (no checkout, no inherit)."
                 echo "                         tmux session is <repo>/~<name>; unnamed gets ~scratchN."
                 echo "  --from <branch>        Inherit claude context from <branch> (use after merging)"
@@ -1791,6 +1830,7 @@ ct() {
                 echo "  ct                                  # attach/open session for current branch"
                 echo "  ct sam/my-feature                   # switch to branch and open its session"
                 echo "  ct --new                            # start fresh, discarding existing session"
+                echo "  ct --codex                          # codex on the current branch, alongside claude"
                 echo "  ct --ephemeral followup-memory      # branch-independent scratch session"
                 echo "  ct sam/new --from sam/old           # new branch, carry over old branch's context"
                 echo "  ct --resume abc-123-def             # wire a specific session ID to current branch"
@@ -1815,8 +1855,10 @@ ct() {
             done
             name="scratch${n}"
         fi
-        session_name="${repo}/~${name}"
-        key="${repo}/~${name}"
+        local suffix=""
+        [ "$agent" = codex ] && suffix=":codex"
+        session_name="${repo}/~${name}${suffix}"
+        key="${repo}/~${name}${suffix}"
 
         if [ "$force_new" = true ] && tmux has-session -t "=$session_name" 2>/dev/null; then
             echo "Killing existing tmux session $session_name" | yellow
@@ -1832,7 +1874,7 @@ ct() {
 
         claude_link_worktree_projectdir
         sleep 0.5
-        tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && claude_resume_or_new '${key}'"
+        tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && ${agent}_resume_or_new '${key}'"
         return
     fi
 
@@ -1841,9 +1883,11 @@ ct() {
         echo "Cannot start ct from a detached HEAD. Specify a branch or checkout one first." | red
         return 1
     fi
-    local repo
+    local repo agent_suffix
     repo="$(git_repo_name)"
-    local session_name="${repo}/${branch}"
+    agent_suffix=""
+    [ "$agent" = codex ] && agent_suffix=":codex"
+    local session_name="${repo}/${branch}${agent_suffix}"
 
     # Switch branch if specified and different from current
     if [ -n "$branch_arg" ]; then
@@ -1852,7 +1896,7 @@ ct() {
             if [ -n "$match" ]; then
                 echo "auto-matching branch $match" | yellow
                 branch="$match"
-                session_name="${repo}/${branch}"
+                session_name="${repo}/${branch}${agent_suffix}"
                 git checkout "$match" || return 1
             else
                 echo "No branch matching '$branch_arg'" >&2
@@ -1875,7 +1919,7 @@ ct() {
         return
     fi
 
-    local key="${repo}/${branch}"
+    local key="${repo}/${branch}${agent_suffix}"
     local map_file="$HOME/.claude/branch_sessions"
 
     # Clear old session mapping if --new
@@ -1921,7 +1965,7 @@ ct() {
     claude_link_worktree_projectdir
 
     sleep 0.5
-    tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && claude_resume_or_new '${key}'"
+    tmux new -s "$session_name" "source '${SRPUB_DIR}/bashrc' && ${agent}_resume_or_new '${key}'"
 }
 
 ############################################################

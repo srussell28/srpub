@@ -1,0 +1,117 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Palette</title>
+<style>
+  :root {
+    --run-1:  #2a78d6; --run-2:  #eb6834; --run-3:  #1baf7a; --run-4:  #eda100;
+    --run-5:  #e87ba4; --run-6:  #7c5cd6; --run-7:  #0f9aa8; --run-8:  #b0413e;
+    --run-9:  #7d8b26; --run-10: #8c6239;
+    --bg: #fff; --fg: #1a1a1a; --muted: #6b6b6b; --line: #e2e2e2; --card: #fafafa;
+  }
+  .dark {
+    --run-1:  #3987e5; --run-2:  #d95926; --run-3:  #199e70; --run-4:  #c98500;
+    --run-5:  #d55181; --run-6:  #8f72e0; --run-7:  #12aec0; --run-8:  #c9524f;
+    --run-9:  #8f9d2e; --run-10: #a0764a;
+    --bg: #14161a; --fg: #e8e8e8; --muted: #9a9a9a; --line: #2b2f36; --card: #1b1e24;
+  }
+  body {
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 32px; background: #fff; color: #1a1a1a;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: #6b6b6b; margin: 0 0 28px; max-width: 60ch; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .modes { grid-template-columns: 1fr; } }
+  section {
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 18px;
+  }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+       color: var(--muted); margin: 0 0 14px; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 5px 0; }
+  .sw { width: 46px; height: 26px; border-radius: 5px; flex: none;
+        border: 1px solid rgba(128,128,128,.25); cursor: pointer; }
+  .n { width: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .name { width: 62px; }
+  .hex { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+         color: var(--muted); cursor: pointer; }
+  .role { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .demo { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chip { font-size: 12px; padding: 3px 10px; border-radius: 999px;
+          color: #fff; font-weight: 500; }
+  .bars { display: flex; flex-direction: column; gap: 5px; }
+  .bar { height: 12px; border-radius: 3px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 12px; }
+  footer { color: #6b6b6b; font-size: 12px; margin-top: 26px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+
+<h1>Colorblind-safe palette</h1>
+<p class="sub">
+  The sequence from <code>claude/CLAUDE.md</code>. Order carries the
+  colorblind-safety: the first five have the most separation, so use them in
+  order and append rather than reorder. Click a swatch or hex to copy.
+</p>
+
+<div class="modes">
+  <section id="light"><h2>Light</h2></section>
+  <section id="dark" class="dark"><h2>Dark</h2></section>
+</div>
+
+<footer>Semantic pairs: green = 3, red = 8, blue = 1, orange = 2.</footer>
+
+<script>
+  const COLORS = [
+    ["blue",   "#2a78d6", "#3987e5", "blue"],
+    ["orange", "#eb6834", "#d95926", "orange"],
+    ["green",  "#1baf7a", "#199e70", "green / ok"],
+    ["amber",  "#eda100", "#c98500", ""],
+    ["pink",   "#e87ba4", "#d55181", ""],
+    ["purple", "#7c5cd6", "#8f72e0", ""],
+    ["teal",   "#0f9aa8", "#12aec0", ""],
+    ["red",    "#b0413e", "#c9524f", "red / error"],
+    ["olive",  "#7d8b26", "#8f9d2e", ""],
+    ["brown",  "#8c6239", "#a0764a", ""],
+  ];
+
+  const copy = (hex, el) => {
+    navigator.clipboard?.writeText(hex);
+    const was = el.textContent;
+    el.textContent = "copied";
+    setTimeout(() => (el.textContent = was), 800);
+  };
+
+  for (const [id, idx] of [["light", 1], ["dark", 2]]) {
+    const host = document.getElementById(id);
+    COLORS.forEach(([name, ...rest], i) => {
+      const hex = rest[idx - 1], role = rest[2];
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        `<span class="n">${i + 1}</span>` +
+        `<span class="sw" style="background:${hex}" title="${hex}"></span>` +
+        `<span class="name">${name}</span>` +
+        `<span class="hex">${hex}</span>` +
+        `<span class="role">${role}</span>`;
+      const label = row.querySelector(".hex");
+      row.querySelector(".sw").onclick = () => copy(hex, label);
+      label.onclick = () => copy(hex, label);
+      host.appendChild(row);
+    });
+
+    // The colors in context: status chips and a stacked series.
+    const demo = document.createElement("div");
+    demo.className = "demo";
+    demo.innerHTML =
+      `<div class="chips">` +
+      [["passed", 3], ["failed", 8], ["running", 1], ["queued", 2], ["skipped", 6]]
+        .map(([t, n]) => `<span class="chip" style="background:var(--run-${n})">${t}</span>`)
+        .join("") +
+      `</div><div class="bars">` +
+      [90, 74, 61, 48, 30].map((w, k) =>
+        `<div class="bar" style="width:${w}%;background:var(--run-${k + 1})"></div>`).join("") +
+      `</div><div class="note">Same five colors as chips and as series.</div>`;
+    host.appendChild(demo);
+  }
+</script>

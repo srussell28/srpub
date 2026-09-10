@@ -1,7 +1,6 @@
 # Per-machine settings srpub picks up. Set before sourcing bashrc.
 #   GIT_TRUNK   trunk to branch from / rebase onto, when it isn't the
 #               remote's HEAD (e.g. export GIT_TRUNK=origin/develop)
-#   PALETTE_CSS css file whose palette Claude should reuse for red/green
 # export GIT_TRUNK=origin/develop
 
 echo "Loading srpub/bashrc"

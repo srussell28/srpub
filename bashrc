@@ -1018,15 +1018,16 @@ nwt() {
     if [ -z "$name" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         echo "Usage: nwt <name> [start-point]"
         echo "Adds a worktree at <primary checkout>-worktrees/<name> on a new"
-        echo "sam/<name> branch, cut from the trunk (origin/develop, else"
-        echo "origin/main) and tracking it, then cds into it."
+        echo "sam/<name> branch, cut from the trunk (\$GIT_TRUNK, else the"
+        echo "remote's HEAD) and tracking it, then cds into it."
         [ -n "$1" ] && return 0
         return 1
     fi
     local main_root
     main_root=$(git_main_root) || { echo "not in a git repo" | red; return 1; }
 
-    local trunk="origin/develop"
+    # $GIT_TRUNK (set per-machine in ~/.zshrc) overrides the remote's HEAD.
+    local trunk="${GIT_TRUNK:-$(git_main_origin)}"
     git show-ref --verify --quiet "refs/remotes/$trunk" || trunk="origin/main"
     # not "path": that is a special zsh variable tied to $PATH
     local wt_dir="$main_root-worktrees/$name"
@@ -1700,7 +1701,7 @@ sonet() {
 }
 
 # Path of the main checkout, identical from the main checkout and any of its
-# worktrees. --show-toplevel would give the worktree dir (~/Chromatic-dos), which
+# worktrees. --show-toplevel would give the worktree dir (~/myrepo-worktrees/x), which
 # keys ct sessions per-directory; --git-common-dir always points at the main .git.
 git_main_root() {
     local common

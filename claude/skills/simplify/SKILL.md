@@ -11,9 +11,9 @@ It is OK to find nothing. If the branch is already lean, say so plainly and stop
 
 ## Scope
 
-Assume the branch is a feature branch targeting a GitHub PR against the repo's trunk (`origin/develop` in Chromatic; `origin/main` elsewhere).
+Assume the branch is a feature branch targeting a GitHub PR against the repo's trunk.
 
-1. Determine the trunk via `git remote show origin | grep 'HEAD branch'` or fall back to `origin/develop` then `origin/main`.
+1. Determine the trunk: `$GIT_TRUNK` if set, else `git symbolic-ref refs/remotes/origin/HEAD`, else `origin/main`.
 2. Determine the merge base: `git merge-base HEAD <trunk>`.
 3. Review the full branch diff against that merge base, plus the surrounding code it touches — not just the diff hunks. You need to see what already exists in the repo to spot reuse opportunities.
 

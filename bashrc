@@ -1011,6 +1011,32 @@ gnb() {
         gco -b $1 $2
     fi
 }
+nwt() {
+    # New worktree at <primary>-worktrees/<name>, on a new sam/<name> branch
+    # cut from the trunk and tracking it. Optional 2nd arg overrides the start point.
+    local name="${1#sam/}"
+    if [ -z "$name" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: nwt <name> [start-point]"
+        echo "Adds a worktree at <primary checkout>-worktrees/<name> on a new"
+        echo "sam/<name> branch, cut from the trunk (origin/develop, else"
+        echo "origin/main) and tracking it, then cds into it."
+        [ -n "$1" ] && return 0
+        return 1
+    fi
+    local main_root
+    main_root=$(git_main_root) || { echo "not in a git repo" | red; return 1; }
+
+    local trunk="origin/develop"
+    git show-ref --verify --quiet "refs/remotes/$trunk" || trunk="origin/main"
+    # not "path": that is a special zsh variable tied to $PATH
+    local wt_dir="$main_root-worktrees/$name"
+
+    echo "worktree $wt_dir on sam/$name (from ${2:-$trunk})" | yellow
+    git worktree add -b "sam/$name" "$wt_dir" "${2:-$trunk}" || return 1
+    git -C "$wt_dir" branch --set-upstream-to="$trunk" "sam/$name" || return 1
+    cd "$wt_dir" && claude_link_worktree_projectdir
+}
+
 gbd() {
     local branch="$1"
     # Resolve branch name (with fuzzy match if needed) before doing anything.
@@ -1056,15 +1082,21 @@ gbd() {
     # Kill any tmux claude session for this branch
     if [ -n "$branch" ]; then
         local repo=$(git_repo_name)
-        local session_name="${repo}/${branch}"
-        if tmux has-session -t "=$session_name" 2>/dev/null; then
-            echo "Killing tmux claude session $session_name" | yellow
-            tmux kill-session -t "=$session_name"
-        fi
+        local session_name
+        for session_name in "${repo}/${branch}" "${repo}/${branch}-codex"; do
+            if tmux has-session -t "=$session_name" 2>/dev/null; then
+                echo "Killing tmux session $session_name" | yellow
+                tmux kill-session -t "=$session_name"
+            fi
+        done
         # Clean up branch_sessions and branch_parents maps
         local key="${repo}/${branch}"
         local map_file="$HOME/.claude/branch_sessions"
-        [ -f "$map_file" ] && sed -i.bak "\|^${key} |d" "$map_file"
+        # Comment the row out rather than dropping it: the claude transcript
+        # outlives the branch, so keeping the id makes the session recoverable
+        # with ct <branch> --resume <sid>. Lookups match "^<key> ", so the
+        # prefix also stops a future branch of the same name resuming it.
+        [ -f "$map_file" ] && sed -i.bak "s|^${key} |#deleted:$(date +%F) ${key} |" "$map_file"
         local parents_file="$HOME/.claude/branch_parents"
         [ -f "$parents_file" ] && sed -i.bak "\|^${key} |d" "$parents_file"
     fi
@@ -1820,7 +1852,7 @@ ct() {
                 echo ""
                 echo "Options:"
                 echo "  --new                  Kill any existing session and start fresh"
-                echo "  --codex                Run codex instead of claude (session name gets a :codex suffix)"
+                echo "  --codex                Run codex instead of claude (session name gets a -codex suffix)"
                 echo "  --ephemeral, -e [name] Session tied to no branch (no checkout, no inherit)."
                 echo "                         tmux session is <repo>/~<name>; unnamed gets ~scratchN."
                 echo "  --from <branch>        Inherit claude context from <branch> (use after merging)"
@@ -1856,7 +1888,7 @@ ct() {
             name="scratch${n}"
         fi
         local suffix=""
-        [ "$agent" = codex ] && suffix=":codex"
+        [ "$agent" = codex ] && suffix="-codex"
         session_name="${repo}/~${name}${suffix}"
         key="${repo}/~${name}${suffix}"
 
@@ -1886,8 +1918,14 @@ ct() {
     local repo agent_suffix
     repo="$(git_repo_name)"
     agent_suffix=""
-    [ "$agent" = codex ] && agent_suffix=":codex"
+    # not ":codex": tmux reads ':' in a target as session:window, so a colon in
+    # the name makes the session unaddressable by has-session/attach/kill
+    [ "$agent" = codex ] && agent_suffix="-codex"
     local session_name="${repo}/${branch}${agent_suffix}"
+    # bare ct picks up an existing session for the branch whichever agent it
+    # runs; --codex is an explicit ask, so it only looks for its own
+    local alt_name=""
+    [ "$agent" = codex ] || alt_name="${repo}/${branch}-codex"
 
     # Switch branch if specified and different from current
     if [ -n "$branch_arg" ]; then
@@ -1897,6 +1935,7 @@ ct() {
                 echo "auto-matching branch $match" | yellow
                 branch="$match"
                 session_name="${repo}/${branch}${agent_suffix}"
+                [ "$agent" = codex ] || alt_name="${repo}/${branch}-codex"
                 git checkout "$match" || return 1
             else
                 echo "No branch matching '$branch_arg'" >&2
@@ -1911,11 +1950,17 @@ ct() {
         tmux kill-session -t "=$session_name"
     fi
 
-    # Attach to existing tmux session if one exists
+    # Attach to existing tmux session if one exists (either agent's)
+    local existing=""
     if tmux has-session -t "=$session_name" 2>/dev/null; then
-        echo "Attaching to existing tmux session $session_name" | yellow
+        existing="$session_name"
+    elif [ -n "$alt_name" ] && tmux has-session -t "=$alt_name" 2>/dev/null; then
+        existing="$alt_name"
+    fi
+    if [ -n "$existing" ]; then
+        echo "Attaching to existing tmux session $existing" | yellow
         sleep 0.5
-        tmux attach -t "=$session_name"
+        tmux attach -t "=$existing"
         return
     fi
 

@@ -1,14 +1,12 @@
 - try to make things simple.  try to use fewer lines of code, and more straightforward code when possible as long as we dont have to sacrifice functionality
 
-- if there is a sufficiently tricky issue, its okay to add some debug printing and re-run vs trying to guess the solution
+- if there is a sufficiently tricky issue thats not obvious how to diagnose, its okay to add some debug logging and re-run, or even merge debug logging and await repro vs trying to guess the solution
 
-- in python, avoid local/defered imports unless they're strictly necessary or asked for
-
-- always use color-blind friendly reds/greens when desining UIs or tables or such
+- in python, avoid local/defered/in-function imports unless they're strictly necessary or asked for
 
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
-- Keep inline comments, PR descriptions, and function docstrings concise.  Avoid adding inline comments that describe the logic behind a change being made, that sort of thing belongs in the PR description, the inline comment should only be whats needed for someone to understand the current state of the code after merge.
+- Keep inline comments, PR descriptions, and function docstrings as concise/short as possible while including key information.  Avoid adding inline comments that describe the logic behind a change being made, that sort of thing belongs in the PR description, the inline comment should only be included if its needed to help someone to understand the current state of the code after merge.
 
 - when adding tests, try to be judicious about how many we add.  Aim to add unit tests at a middle-level, where we're covering meainigful amounts of logic/code, but not quite as high-level as an integration test woudl be.  Adding too many tests can lead to excssive change-detection.
 

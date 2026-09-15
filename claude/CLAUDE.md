@@ -6,7 +6,7 @@
 
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
-- Keep inline comments, PR descriptions, and function docstrings as concise/short as possible while including key information.  Avoid adding inline comments that describe the logic behind a change being made, that sort of thing belongs in the PR description, the inline comment should only be included if its needed to help someone to understand the current state of the code after merge.
+- Keep inline comments, PR descriptions, and function docstrings short — default to too short, I'll ask for more.  Before each sentence, ask whether someone reading the diff already knows it; if so, cut it.  Inline comments are 1-2 lines and only cover what's needed to understand the code as merged — the rationale for a change belongs in the PR description, not in the code.
 
 - when adding tests, try to be judicious about how many we add.  Aim to add unit tests at a middle-level, where we're covering meainigful amounts of logic/code, but not quite as high-level as an integration test woudl be.  Adding too many tests can lead to excssive change-detection.
 

@@ -14,6 +14,7 @@ eval "$(echo "$input" | jq -r '@sh "
   dels=\(.cost.total_lines_removed // 0)
   rl=\(.rate_limits.five_hour.used_percentage // 0)
   transcript=\(.transcript_path // "")
+  scratch=\(.scratchpad_dir // "")
 "' 2>/dev/null)"
 # Guard against non-numeric values reaching the arithmetic tests below
 [[ $adds =~ ^[0-9]+$ ]] || adds=0
@@ -65,9 +66,13 @@ if [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
         "$adds" "$dels"
 fi
 
-# Second line: the latest thing asked for in this session, to tell sessions
-# apart when several are open. Tail-limited so transcript size doesn't matter.
-if [ -n "$transcript" ] && [ -f "$transcript" ]; then
+# Second line: what this session is working on, to tell several apart. Prefers
+# the topic Claude maintains in its scratchpad, else the latest request.
+topic=""
+[ -n "$scratch" ] && [ -f "$scratch/topic" ] &&
+    topic=$(head -1 "$scratch/topic" | tr -d '\n' | cut -c1-72)
+
+if [ -z "$topic" ] && [ -n "$transcript" ] && [ -f "$transcript" ]; then
     topic=$(tail -400 "$transcript" 2>/dev/null | jq -rs '
         map(select(.type=="user") | .message.content
             | if type=="string" then .
@@ -77,7 +82,7 @@ if [ -n "$transcript" ] && [ -f "$transcript" ]; then
                      and (contains("tool_result") | not)))
         | last // empty' 2>/dev/null |
         tr '\n' ' ' | sed 's/  */ /g; s/^ //' | cut -c1-72)
-    [ -n "$topic" ] && printf '\n\033[90m↳ %s\033[0m' "$topic"
 fi
+[ -n "$topic" ] && printf '\n\033[90m↳ %s\033[0m' "$topic"
 
 exit 0  # never fail: a nonzero exit makes Claude Code drop the status line

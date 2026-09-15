@@ -4,7 +4,7 @@
 # The +N-M by the branch is the diff vs the trunk merge-base; "sess" is what
 # this Claude session has written (cumulative, unaffected by commits).
 input=$(cat)
-model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0
+model="?" effort="" dir="." ctx="" adds=0 dels=0 rl=0 transcript=""
 eval "$(echo "$input" | jq -r '@sh "
   model=\(.model.display_name // "?")
   effort=\(.effort.level // "")
@@ -13,6 +13,7 @@ eval "$(echo "$input" | jq -r '@sh "
   adds=\(.cost.total_lines_added // 0)
   dels=\(.cost.total_lines_removed // 0)
   rl=\(.rate_limits.five_hour.used_percentage // 0)
+  transcript=\(.transcript_path // "")
 "' 2>/dev/null)"
 # Guard against non-numeric values reaching the arithmetic tests below
 [[ $adds =~ ^[0-9]+$ ]] || adds=0
@@ -62,6 +63,21 @@ printf ' \033[90m|\033[0m \033[%sm5h %s%%\033[0m' "$c" "$pct"
 if [ "$adds" -gt 0 ] || [ "$dels" -gt 0 ]; then
     printf ' \033[90m|\033[0m \033[90msess\033[0m \033[32m+%s\033[0m\033[31m-%s\033[0m' \
         "$adds" "$dels"
+fi
+
+# Second line: the latest thing asked for in this session, to tell sessions
+# apart when several are open. Tail-limited so transcript size doesn't matter.
+if [ -n "$transcript" ] && [ -f "$transcript" ]; then
+    topic=$(tail -400 "$transcript" 2>/dev/null | jq -rs '
+        map(select(.type=="user") | .message.content
+            | if type=="string" then .
+              elif type=="array" then (map(select(type=="object" and .type=="text") | .text) | join(" "))
+              else empty end)
+        | map(select(length > 0 and (startswith("<") | not)
+                     and (contains("tool_result") | not)))
+        | last // empty' 2>/dev/null |
+        tr '\n' ' ' | sed 's/  */ /g; s/^ //' | cut -c1-72)
+    [ -n "$topic" ] && printf '\n\033[90m↳ %s\033[0m' "$topic"
 fi
 
 exit 0  # never fail: a nonzero exit makes Claude Code drop the status line

@@ -857,6 +857,20 @@ _worktree_path_for_branch() {
     '
 }
 
+_worktree_pinned() {
+    # A linked worktree holds one branch; only the primary checkout swaps freely.
+    # Returns 0 (block) if we're in a linked worktree and $1 is some other branch.
+    local branch="$1" current
+    [[ "$(git rev-parse --git-dir 2>/dev/null)" == */worktrees/* ]] || return 1
+    current=$(git branch --show-current)
+    [ "$branch" = "$current" ] && return 1
+    # Only guard real branches — file paths and SHAs still go to git checkout.
+    git show-ref --verify --quiet "refs/heads/$branch" ||
+        git show-ref --verify --quiet "refs/remotes/origin/$branch" || return 1
+    echo "refusing: this worktree is for '$current'" | red
+    echo "use 'primary $branch', or 'nwt' for a new worktree" | yellow
+}
+
 _bazel_output_base_for_path() {
     # Print the bazel output base for a workspace path, if bazel made one.
     # Bazel names it md5(<workspace path>), so a worktree gets its own.
@@ -910,30 +924,30 @@ primary() {
 }
 
 gco() {
-    local branch="$1"
+    # zsh re-prints a var on a second `local`, so declare them all once here
+    local branch="$1" wt_path substr
     # If branch is checked out in a worktree, cd there instead of checking out.
     if [ -n "$branch" ] && [[ "$branch" != -* ]]; then
-        local wt_path
         wt_path=$(_worktree_path_for_branch "$branch")
         if [ -n "$wt_path" ]; then
             echo "branch '$branch' is in worktree, cd-ing to $wt_path" | yellow
             cd "$wt_path"
             return
         fi
+        _worktree_pinned "$branch" && return 1
     fi
     git checkout $@
     if [ $? -eq 1 ]; then
-        local substr
         substr=$(git branch | sed 's/^[+* ]*//' | _pick_match "$1")
         if [ -n "$substr" ]; then
             echo "auto-matching branch $substr" | yellow
             # Check worktree for the matched branch too
-            local wt_path
             wt_path=$(_worktree_path_for_branch "$substr")
             if [ -n "$wt_path" ]; then
                 echo "branch '$substr' is in worktree, cd-ing to $wt_path" | yellow
                 cd "$wt_path"
             else
+                _worktree_pinned "$substr" && return 1
                 git checkout $substr
             fi
         fi

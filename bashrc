@@ -40,7 +40,13 @@ export PYTHONUNBUFFERED="1"
 # git initialization (only write if unset, so per-machine overrides stick)
 # GIT_TERMINAL_PROMPT=0 prevents credential helpers from prompting during shell init
 GIT_TERMINAL_PROMPT=0 git config --global --get core.editor >/dev/null 2>&1 || git config --global core.editor "vim"
-GIT_TERMINAL_PROMPT=0 git config --global --get user.name >/dev/null 2>&1 || git config --global user.name "Samuel Russell"
+# user.name is an identity, so only stamp it on machines that are mine.
+# Keep this list in sync with sam_usernames in pytools/srutils.py.
+case "$USER" in
+    sam|samrussell|samuel|sr228822|srussell28|a.sam.russell)
+        GIT_TERMINAL_PROMPT=0 git config --global --get user.name >/dev/null 2>&1 ||
+            git config --global user.name "Samuel Russell" ;;
+esac
 #git config --global user.email "foobar@foobar.foo"
 
 export KUBE_EDITOR='vim'

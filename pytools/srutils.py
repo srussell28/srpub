@@ -24,6 +24,21 @@ basedir, _ = os.path.split(__file__)
 
 my_email = codecs.decode(b"737232323838323240676d61696c2e636f6d", "hex").decode()
 name_aliases = ["Samuel Russell", "Sam Russell"]
+# Usernames on machines that are mine. Keep in sync with bashrc's is_sam case.
+sam_usernames = [
+    "sam",
+    "samrussell",
+    "samuel",
+    "sr228822",
+    "srussell28",
+    "a.sam.russell",
+]
+
+
+def is_sam_machine() -> bool:
+    """True on a machine of mine, where stamping my git identity is right."""
+    return os.environ.get("USER", "") in sam_usernames
+
 
 if __name__ == "__main__":
     print("nope")

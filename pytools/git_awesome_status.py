@@ -19,6 +19,7 @@ from srutils import (
     DiskCache,
     cmd,
     get_term_size,
+    is_sam_machine,
     is_windows,
     my_email,
     name_aliases,
@@ -76,14 +77,7 @@ def check_config():
     Check if global git config is set for user email, user name, etc.
     Only prompt to set defaults if this looks like Sam's machine; otherwise just warn.
     """
-    import os
-
-    is_sam = any(
-        alias in (os.environ.get("USER", "") + os.environ.get("HOME", ""))
-        for alias in name_aliases
-        + ["sr228822", "samrussell", "samuel", "a.sam.russell", "srussell28"]
-    )
-
+    is_sam = is_sam_machine()
     print("1st run checking git config:")
     for key, value in git_config_defaults.items():
         current_val = cmd(f"git config --global --get {key}")

@@ -6,6 +6,8 @@
 
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
+- Try to incrementally commit progress, I prefer not to have large changes sitting un-comitted (in unstaged/staged changes).  You may commit with --no-verify and then go work on fixing pre-commit later before pushing to streamline things.
+
 - Keep inline comments, PR descriptions, and function docstrings short — default to too short, I'll ask for more.  Before each sentence, ask whether someone reading the diff already knows it; if so, cut it.  Inline comments are 1-2 lines and only cover what's needed to understand the code as merged — the rationale for a change belongs in the PR description, not in the code.
 
 - when adding tests, try to be judicious about how many we add.  Aim to add unit tests at a middle-level, where we're covering meainigful amounts of logic/code, but not quite as high-level as an integration test woudl be.  Adding too many tests can lead to excssive change-detection.

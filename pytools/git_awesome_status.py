@@ -813,6 +813,8 @@ def main():
         padded_branch = f"%-{max_branch_len}s" % branch
         if args.branch and branch == checked_out:
             padded_branch = blue_str(padded_branch)
+        elif remote_status.get(branch) == "gone":
+            padded_branch = red_str(padded_branch)  # deletable; outranks worktree
         elif branch in worktree_branches:
             padded_branch = yellow_str(padded_branch)  # checked out in a worktree
         elif not args.no_remote_status:

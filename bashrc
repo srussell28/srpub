@@ -1870,6 +1870,7 @@ ct() {
                 echo ""
                 echo "  Opens (or attaches to) a tmux+claude session for a git branch."
                 echo "  Defaults to the current branch if none specified."
+                echo "  Outside a git repo, the session is keyed to the current folder instead."
                 echo ""
                 echo "Options:"
                 echo "  --new                  Kill any existing session and start fresh"
@@ -1931,22 +1932,32 @@ ct() {
         return
     fi
 
-    local branch="${branch_arg:-$(git branch --show-current)}"
-    if [ -z "$branch" ]; then
-        echo "Cannot start ct from a detached HEAD. Specify a branch or checkout one first." | red
+    # $base identifies the session: "<repo>/<branch>" in a git repo, or just the
+    # directory name outside one.
+    local repo branch base agent_suffix
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+        branch="${branch_arg:-$(git branch --show-current)}"
+        if [ -z "$branch" ]; then
+            echo "Cannot start ct from a detached HEAD. Specify a branch or checkout one first." | red
+            return 1
+        fi
+        repo="$(git_repo_name)"
+        base="${repo}/${branch}"
+    elif [ -n "$branch_arg" ]; then
+        echo "Not a git repo, so '$branch_arg' can't be checked out. Run bare 'ct' for a session on this folder." | red
         return 1
+    else
+        base="$(basename "$PWD")"
     fi
-    local repo agent_suffix
-    repo="$(git_repo_name)"
     agent_suffix=""
     # not ":codex": tmux reads ':' in a target as session:window, so a colon in
     # the name makes the session unaddressable by has-session/attach/kill
     [ "$agent" = codex ] && agent_suffix="-codex"
-    local session_name="${repo}/${branch}${agent_suffix}"
+    local session_name="${base}${agent_suffix}"
     # bare ct picks up an existing session for the branch whichever agent it
     # runs; --codex is an explicit ask, so it only looks for its own
     local alt_name=""
-    [ "$agent" = codex ] || alt_name="${repo}/${branch}-codex"
+    [ "$agent" = codex ] || alt_name="${base}-codex"
 
     # Switch branch if specified and different from current
     if [ -n "$branch_arg" ]; then
@@ -1955,8 +1966,9 @@ ct() {
             if [ -n "$match" ]; then
                 echo "auto-matching branch $match" | yellow
                 branch="$match"
-                session_name="${repo}/${branch}${agent_suffix}"
-                [ "$agent" = codex ] || alt_name="${repo}/${branch}-codex"
+                base="${repo}/${branch}"
+                session_name="${base}${agent_suffix}"
+                [ "$agent" = codex ] || alt_name="${base}-codex"
                 git checkout "$match" || return 1
             else
                 echo "No branch matching '$branch_arg'" >&2
@@ -1985,7 +1997,7 @@ ct() {
         return
     fi
 
-    local key="${repo}/${branch}${agent_suffix}"
+    local key="$session_name"
     local map_file="$HOME/.claude/branch_sessions"
 
     # Clear old session mapping if --new

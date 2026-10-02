@@ -1034,13 +1034,26 @@ gnb() {
 nwt() {
     # New worktree at <primary>-worktrees/<name>, on a new sam/<name> branch
     # cut from the trunk and tracking it. Optional 2nd arg overrides the start point.
-    local name="${1#sam/}"
-    if [ -z "$name" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-        echo "Usage: nwt <name> [start-point]"
+    local name="" start="" from_branch="" arg i=1
+    while [[ $i -le $# ]]; do
+        arg="${@:$i:1}"
+        case "$arg" in
+            --from) (( i++ )); from_branch="${@:$i:1}" ;;
+            -h|--help) name="" ; break ;;
+            *) if [ -z "$name" ]; then name="$arg"; else start="$arg"; fi ;;
+        esac
+        (( i++ ))
+    done
+    name="${name#sam/}"
+    if [ -z "$name" ]; then
+        echo "Usage: nwt <name> [start-point] [--from <branch>]"
         echo "Adds a worktree at <primary checkout>-worktrees/<name> on a new"
         echo "sam/<name> branch, cut from the trunk (\$GIT_TRUNK, else the"
         echo "remote's HEAD) and tracking it, then cds into it."
-        [ -n "$1" ] && return 0
+        echo ""
+        echo "  --from <branch>  Hand the new session <branch>'s claude context"
+        echo "                   (ct --from), then offer to gbd <branch>."
+        [ "$1" = "-h" ] || [ "$1" = "--help" ] && return 0
         return 1
     fi
     local main_root
@@ -1052,10 +1065,49 @@ nwt() {
     # not "path": that is a special zsh variable tied to $PATH
     local wt_dir="$main_root-worktrees/$name"
 
-    echo "worktree $wt_dir on sam/$name (from ${2:-$trunk})" | yellow
-    git worktree add -b "sam/$name" "$wt_dir" "${2:-$trunk}" || return 1
+    # Resolve --from now, while we are still beside the old branch.
+    if [ -n "$from_branch" ] &&
+       ! git show-ref --verify --quiet "refs/heads/$from_branch"; then
+        local matched
+        matched=$(git branch | sed 's/^[+* ]*//' | _pick_match "$from_branch")
+        if [ -z "$matched" ]; then
+            echo "no branch matching '$from_branch'" | red; return 1
+        fi
+        echo "auto-matching --from branch $matched" | yellow
+        from_branch="$matched"
+    fi
+
+    echo "worktree $wt_dir on sam/$name (from ${start:-$trunk})" | yellow
+    git worktree add -b "sam/$name" "$wt_dir" "${start:-$trunk}" || return 1
     git -C "$wt_dir" branch --set-upstream-to="$trunk" "sam/$name" || return 1
     cd "$wt_dir" && claude_link_worktree_projectdir
+    [ -z "$from_branch" ] && return 0
+
+    # gbd would refuse while the old branch is checked out somewhere, and the
+    # primary checkout is the one spot we can free up for it.
+    local primary_path
+    primary_path=$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')
+    if [ "$(git -C "$primary_path" branch --show-current)" = "$from_branch" ]; then
+        echo "parking primary checkout on ${trunk#origin/}" | yellow
+        git -C "$primary_path" checkout "${trunk#origin/}" 2>/dev/null
+    fi
+
+    ct --from "$from_branch"   # blocks until the session detaches
+
+    # Back from the session: offer to retire the old branch.
+    local unmerged
+    unmerged=$(git rev-list --count "$trunk..$from_branch" 2>/dev/null)
+    if [ "${unmerged:-0}" -gt 0 ]; then
+        echo "'$from_branch' has $unmerged commit(s) not in $trunk — gbd would discard them" | red
+    else
+        echo "'$from_branch' is fully merged into $trunk" | green
+    fi
+    printf "gbd %s (delete branch, worktree and tmux session)? [y/N] " "$from_branch"
+    local reply; read -r reply
+    case "$reply" in
+        [yY]*) gbd "$from_branch" ;;
+        *) echo "keeping $from_branch" | yellow ;;
+    esac
 }
 
 gbd() {

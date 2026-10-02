@@ -1031,6 +1031,19 @@ gnb() {
         gco -b $1 $2
     fi
 }
+_branch_is_merged() {
+    # Is <branch>'s work already in <trunk>? Squash and rebase merges leave no
+    # shared SHA, so fall back to replaying the branch's whole tree as one
+    # synthetic patch and asking git cherry whether it is upstream.
+    local branch="$1" trunk="$2" base synth
+    git merge-base --is-ancestor "$branch" "$trunk" 2>/dev/null && return 0
+    base=$(git merge-base "$trunk" "$branch" 2>/dev/null) || return 1
+    synth=$(git commit-tree "$branch^{tree}" -p "$base" -m _ 2>/dev/null) || return 1
+    [ "$(git cherry "$trunk" "$synth" 2>/dev/null | cut -c1)" = "-" ] && return 0
+    # Last resort: ask GitHub, which knows about merges git cannot reconstruct.
+    [ "$(gh pr view "$branch" --json state -q .state 2>/dev/null)" = MERGED ]
+}
+
 nwt() {
     # New worktree at <primary>-worktrees/<name>, on a new sam/<name> branch
     # cut from the trunk and tracking it. Optional 2nd arg overrides the start point.
@@ -1094,17 +1107,19 @@ nwt() {
 
     ct --from "$from_branch"   # blocks until the session detaches
 
-    # Back from the session: offer to retire the old branch.
-    local unmerged
-    unmerged=$(git rev-list --count "$trunk..$from_branch" 2>/dev/null)
-    if [ "${unmerged:-0}" -gt 0 ]; then
-        echo "'$from_branch' has $unmerged commit(s) not in $trunk — gbd would discard them" | red
+    # Back from the session: offer to retire the old branch. Default to yes once
+    # it is merged, since that is the whole point of handing the context over.
+    local prompt="[y/N]" default="n" unmerged
+    if _branch_is_merged "$from_branch" "$trunk"; then
+        echo "'$from_branch' is merged into $trunk" | green
+        prompt="[Y/n]" default="y"
     else
-        echo "'$from_branch' is fully merged into $trunk" | green
+        unmerged=$(git rev-list --count "$trunk..$from_branch" 2>/dev/null)
+        echo "'$from_branch' has $unmerged commit(s) not in $trunk — gbd would discard them" | red
     fi
-    printf "gbd %s (delete branch, worktree and tmux session)? [y/N] " "$from_branch"
+    printf "gbd %s (delete branch, worktree and tmux session)? %s " "$from_branch" "$prompt"
     local reply; read -r reply
-    case "$reply" in
+    case "${reply:-$default}" in
         [yY]*) gbd "$from_branch" ;;
         *) echo "keeping $from_branch" | yellow ;;
     esac

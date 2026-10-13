@@ -1,0 +1,431 @@
+{
+  "BTTPresetCreatorNotes" : "",
+  "BTTPresetInfoURL" : "",
+  "BTTPresetName" : "Merged - Default - mybettertouch",
+  "BTTPresetColor" : "56.181600, 137.194080, 208.080000, 255.000000",
+  "BTTPresetUUID" : "C14EE9D1-2AE8-4C39-96C6-28B4F4294D04",
+  "BTTPresetContent" : [
+    {
+      "BTTAppBundleIdentifier" : "BT.G",
+      "BTTAppName" : "Global",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTAppSpecificSettings" : {
+        "BTTDisableGlobalTriggers" : false
+      },
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1791935542.896349,
+          "BTTTriggerType" : 107,
+          "BTTTriggerTypeDescription" : "4 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "0B9CE76A-09BE-4CB1-A4F9-AA9DE847CF65",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,13",
+          "BTTOrder" : 0,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1791935542.8962421,
+              "BTTTriggerParentUUID" : "0B9CE76A-09BE-4CB1-A4F9-AA9DE847CF65",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "54CCB9F6-5EB7-4655-9C34-CC1E1385C94C",
+              "BTTPredefinedActionType" : 264,
+              "BTTPredefinedActionName" : "",
+              "BTTAutoAdaptActionToKeyboardLayout" : true,
+              "BTTGenericActionConfig" : "autoAdapt",
+              "BTTShortcutToSend" : "55,12",
+              "BTTOrder" : 0
+            }
+          ],
+          "BTTGestureNotes" : "4 Finger Swipe Down"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896163,
+          "BTTTriggerType" : 103,
+          "BTTTriggerTypeDescription" : "3 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "036EB996-0D0F-4C6B-B43F-46AAB29F592E",
+          "BTTPredefinedActionType" : 112,
+          "BTTPredefinedActionName" : "Enter Fullscreen (If Supported)",
+          "BTTOrder" : 1,
+          "BTTGestureNotes" : "3 Finger Swipe Down"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896255,
+          "BTTTriggerType" : 143,
+          "BTTTriggerTypeDescription" : "TipSwipe Left Finger Up (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "9F0BF7FA-1BB5-446E-8A52-F3DAD2569D28",
+          "BTTOrder" : 2,
+          "BTTGestureNotes" : "TipSwipe Left Finger Up (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1711208478.565876,
+          "BTTTriggerType" : 130,
+          "BTTTriggerTypeDescriptionReadOnly" : "5 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "3CF8FFD9-23D3-4FB3-972E-1B86FBDA1290",
+          "BTTOrder" : 3,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1711208478.56587,
+              "BTTTriggerParentUUID" : "3CF8FFD9-23D3-4FB3-972E-1B86FBDA1290",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "0FF20893-BF4F-40A8-846F-42674B03B11F",
+              "BTTPredefinedActionType" : 202,
+              "BTTPredefinedActionName" : "Start Screen Saver",
+              "BTTOrder" : 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "BT.L",
+      "BTTAppName" : "Recently Used",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTTriggers" : [
+
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "com.apple.Safari",
+      "BTTAppName" : "Safari",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTAppSpecificSettings" : {
+        "BTTDisableGlobalTriggers" : false
+      },
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1791935542.8962069,
+          "BTTTriggerType" : 107,
+          "BTTTriggerTypeDescription" : "4 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "D379C75A-2F73-4D77-AA19-507C367C30CD",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,13",
+          "BTTOrder" : 0,
+          "BTTGestureNotes" : "4 Finger Swipe Down"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791934963.2299089,
+          "BTTTriggerType" : 132,
+          "BTTTriggerTypeDescription" : "TipTap Left (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "E8402495-F556-48A0-8616-6A15AC2C5F0E",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "58,55,123",
+          "BTTOrder" : 1,
+          "BTTGestureNotes" : "TipTap Left (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791934963.2298841,
+          "BTTTriggerType" : 133,
+          "BTTTriggerTypeDescription" : "TipTap Right (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "6D18BAD0-D9DE-4FBB-8B59-736E8F54405E",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "58,55,124",
+          "BTTOrder" : 2,
+          "BTTGestureNotes" : "TipTap Right (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791934963.2298532,
+          "BTTTriggerType" : 167,
+          "BTTTriggerTypeDescription" : "2 Finger Swipe From Top Edge",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "6188ABDC-C093-4862-B69A-96D75315ED76",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,15",
+          "BTTOrder" : 3,
+          "BTTGestureNotes" : "2 Finger Swipe From Top Edge"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791934961.120075,
+          "BTTTriggerType" : 112,
+          "BTTTriggerTypeDescription" : "3 Finger Click",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "5839B8D2-8741-4B9C-890A-B053C1A69324",
+          "BTTPredefinedActionType" : 2,
+          "BTTPredefinedActionName" : "CMD(⌘)+Click",
+          "BTTOrder" : 4,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1791934961.1209021,
+              "BTTTriggerParentUUID" : "5839B8D2-8741-4B9C-890A-B053C1A69324",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "DBC5BFFE-515D-4FF3-BB0A-0545EA291AF0",
+              "BTTPredefinedActionType" : 129,
+              "BTTPredefinedActionName" : "Pause Execution  or  Delay Next Action (blocking)",
+              "BTTDelayNextActionBy" : "0.196144",
+              "BTTOrder" : 0
+            },
+            {
+              "BTTLastUpdatedAt" : 1791934961.121444,
+              "BTTTriggerParentUUID" : "5839B8D2-8741-4B9C-890A-B053C1A69324",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "912D8C00-85DA-4530-A6F0-E1EA7D08B591",
+              "BTTPredefinedActionType" : 264,
+              "BTTPredefinedActionName" : "",
+              "BTTAutoAdaptActionToKeyboardLayout" : true,
+              "BTTGenericActionConfig" : "autoAdapt",
+              "BTTShortcutToSend" : "58,55,124",
+              "BTTOrder" : 1
+            }
+          ],
+          "BTTGestureNotes" : "3 Finger Click"
+        }
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "com.apple.Terminal",
+      "BTTAppName" : "Terminal",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTAppSpecificSettings" : {
+        "BTTDisableGlobalTriggers" : false
+      },
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1791935542.8962641,
+          "BTTTriggerType" : 132,
+          "BTTTriggerTypeDescription" : "TipTap Left (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "4E077577-6C57-417A-A161-BAA8FB1A9C98",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "56,55,33",
+          "BTTOrder" : 0,
+          "BTTGestureNotes" : "TipTap Left (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896343,
+          "BTTTriggerType" : 133,
+          "BTTTriggerTypeDescription" : "TipTap Right (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "4B1864E1-8862-40C9-AD28-598FC2AACCDA",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "56,55,30",
+          "BTTOrder" : 1,
+          "BTTGestureNotes" : "TipTap Right (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896323,
+          "BTTTriggerType" : 168,
+          "BTTTriggerTypeDescription" : "2 Finger Swipe From Bottom Edge",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "B2545C9A-F960-463F-8EF6-41B565188175",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "126",
+          "BTTOrder" : 2,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1791935542.8963051,
+              "BTTTriggerParentUUID" : "B2545C9A-F960-463F-8EF6-41B565188175",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "8702B830-75D0-485A-ABB3-23C4108D8A6A",
+              "BTTPredefinedActionType" : 264,
+              "BTTPredefinedActionName" : "",
+              "BTTAutoAdaptActionToKeyboardLayout" : true,
+              "BTTGenericActionConfig" : "autoAdapt",
+              "BTTShortcutToSend" : "36",
+              "BTTOrder" : 0
+            },
+            {
+              "BTTLastUpdatedAt" : 1791935542.896235,
+              "BTTTriggerParentUUID" : "B2545C9A-F960-463F-8EF6-41B565188175",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "5196CAE8-97E8-4617-9AB8-7A62BA4DC754",
+              "BTTPredefinedActionType" : 129,
+              "BTTPredefinedActionName" : "Pause Execution  or  Delay Next Action (blocking)",
+              "BTTDelayNextActionBy" : "0.317671",
+              "BTTOrder" : 1
+            },
+            {
+              "BTTLastUpdatedAt" : 1791935542.8962491,
+              "BTTTriggerParentUUID" : "B2545C9A-F960-463F-8EF6-41B565188175",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "95BC000F-74B6-4715-92D1-034255BA1C8B",
+              "BTTPredefinedActionType" : 264,
+              "BTTPredefinedActionName" : "",
+              "BTTAutoAdaptActionToKeyboardLayout" : true,
+              "BTTGenericActionConfig" : "autoAdapt",
+              "BTTShortcutToSend" : "63,55,119",
+              "BTTOrder" : 2
+            }
+          ],
+          "BTTGestureNotes" : "2 Finger Swipe From Bottom Edge"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896275,
+          "BTTTriggerType" : 107,
+          "BTTTriggerTypeDescription" : "4 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "3946E93A-D572-401C-ABC4-167768A69E9F",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,13",
+          "BTTOrder" : 3,
+          "BTTGestureNotes" : "4 Finger Swipe Down"
+        }
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "com.apple.finder",
+      "BTTAppName" : "Finder",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTAppSpecificSettings" : {
+        "BTTDisableGlobalTriggers" : false
+      },
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1791935542.896369,
+          "BTTTriggerType" : 160,
+          "BTTTriggerTypeDescription" : "2 Finger Swipe Right",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "9834B2F1-B3C6-48A1-8147-DD37E1F79148",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,33",
+          "BTTOrder" : 0,
+          "BTTGestureNotes" : "2 Finger Swipe Right"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896337,
+          "BTTTriggerType" : 159,
+          "BTTTriggerTypeDescription" : "2 Finger Swipe Left",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "852F9C06-3CC3-40C7-BA8E-4E07999E42D5",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,30",
+          "BTTOrder" : 1,
+          "BTTGestureNotes" : "2 Finger Swipe Left"
+        }
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "com.google.Chrome",
+      "BTTAppName" : "Google Chrome",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTAppSpecificSettings" : {
+        "BTTDisableGlobalTriggers" : false
+      },
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1791935542.896173,
+          "BTTTriggerType" : 107,
+          "BTTTriggerTypeDescription" : "4 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "C24E3561-3C75-4755-A36F-8009161A01A8",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,13",
+          "BTTOrder" : 0,
+          "BTTGestureNotes" : "4 Finger Swipe Down"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.8962212,
+          "BTTTriggerType" : 132,
+          "BTTTriggerTypeDescription" : "TipTap Left (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "BBE9CDB5-51A4-4487-BF72-B889A08EEF17",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "58,55,123",
+          "BTTOrder" : 1,
+          "BTTGestureNotes" : "TipTap Left (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.896311,
+          "BTTTriggerType" : 133,
+          "BTTTriggerTypeDescription" : "TipTap Right (2 Fingers Fix)",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "1AECFD51-43EF-4CE7-9908-2992636E693B",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "58,55,124",
+          "BTTOrder" : 2,
+          "BTTGestureNotes" : "TipTap Right (2 Fingers Fix)"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.8963881,
+          "BTTTriggerType" : 167,
+          "BTTTriggerTypeDescription" : "2 Finger Swipe From Top Edge",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "FEA88DAD-636D-4181-AF2A-9FC391A0CCFD",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,15",
+          "BTTOrder" : 3,
+          "BTTGestureNotes" : "2 Finger Swipe From Top Edge"
+        },
+        {
+          "BTTLastUpdatedAt" : 1791935542.8962879,
+          "BTTTriggerType" : 112,
+          "BTTTriggerTypeDescription" : "3 Finger Click",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "2C0211F8-009C-4A13-9CCA-E2D3803BD205",
+          "BTTPredefinedActionType" : 2,
+          "BTTPredefinedActionName" : "CMD(⌘)+Click",
+          "BTTOrder" : 4,
+          "BTTActionsToExecute" : [
+            {
+              "BTTLastUpdatedAt" : 1791935542.896296,
+              "BTTTriggerParentUUID" : "2C0211F8-009C-4A13-9CCA-E2D3803BD205",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "BF7A2E85-1E4F-4716-B703-A201E5041A95",
+              "BTTPredefinedActionType" : 129,
+              "BTTPredefinedActionName" : "Pause Execution  or  Delay Next Action (blocking)",
+              "BTTDelayNextActionBy" : "0.196144",
+              "BTTOrder" : 0
+            },
+            {
+              "BTTLastUpdatedAt" : 1791935542.8963809,
+              "BTTTriggerParentUUID" : "2C0211F8-009C-4A13-9CCA-E2D3803BD205",
+              "BTTIsPureAction" : true,
+              "BTTUUID" : "3A80BFE6-E35F-46C3-82D3-B7291AC853E6",
+              "BTTPredefinedActionType" : 264,
+              "BTTPredefinedActionName" : "",
+              "BTTAutoAdaptActionToKeyboardLayout" : true,
+              "BTTGenericActionConfig" : "autoAdapt",
+              "BTTShortcutToSend" : "58,55,124",
+              "BTTOrder" : 1
+            }
+          ],
+          "BTTGestureNotes" : "3 Finger Click"
+        }
+      ]
+    },
+    {
+      "BTTAppBundleIdentifier" : "org.videolan.vlc",
+      "BTTAppName" : "VLC",
+      "BTTAppAutoInvertIcon" : 1,
+      "BTTAppSpecificSettings" : {
+        "BTTDisableGlobalTriggers" : false
+      },
+      "BTTTriggers" : [
+        {
+          "BTTLastUpdatedAt" : 1791935542.896281,
+          "BTTTriggerType" : 103,
+          "BTTTriggerTypeDescription" : "3 Finger Swipe Down",
+          "BTTTriggerClass" : "BTTTriggerTypeTouchpadAll",
+          "BTTUUID" : "AFF69533-3303-4768-ADEF-990234223FDE",
+          "BTTAutoAdaptActionToKeyboardLayout" : true,
+          "BTTGenericActionConfig" : "autoAdapt",
+          "BTTShortcutToSend" : "55,3",
+          "BTTOrder" : 0,
+          "BTTGestureNotes" : "3 Finger Swipe Down"
+        }
+      ]
+    }
+  ],
+  "BTTPresetSnapAreas" : [
+
+  ]
+}

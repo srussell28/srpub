@@ -40,11 +40,23 @@
     height: var(--card-h, 240px);
   }
   .card:hover { border-color: var(--blue); }
-  .card.waiting { border-top-color: var(--amber); }
-  .card.busy    { border-top-color: var(--green); }
-  .card.agents  { border-top-color: var(--purple); }
+  /* Active states carry a tint and a thicker edge; quiet ones recede, so the
+     contrast does the work rather than one loud colour. */
+  .card.waiting { border-top-color: var(--amber); border-top-width: 5px;
+                  background: color-mix(in srgb, var(--amber) 9%, var(--card));
+                  border-color: color-mix(in srgb, var(--amber) 35%, var(--line));
+                  box-shadow: 0 1px 10px color-mix(in srgb, var(--amber) 18%, transparent); }
+  .card.busy    { border-top-color: var(--green); border-top-width: 5px;
+                  background: color-mix(in srgb, var(--green) 8%, var(--card));
+                  border-color: color-mix(in srgb, var(--green) 30%, var(--line));
+                  box-shadow: 0 1px 10px color-mix(in srgb, var(--green) 15%, transparent); }
+  .card.agents  { border-top-color: var(--purple); border-top-width: 5px;
+                  background: color-mix(in srgb, var(--purple) 8%, var(--card));
+                  border-color: color-mix(in srgb, var(--purple) 30%, var(--line));
+                  box-shadow: 0 1px 10px color-mix(in srgb, var(--purple) 15%, transparent); }
   .card.parked  { border-top-color: var(--blue); }
-  .card.idle    { border-top-color: var(--line); }
+  .card.idle    { border-top-color: var(--line); opacity: .72; }
+  .card.idle:hover, .card.parked:hover { opacity: 1; }
   .detached { opacity: .5; }
 
   /* Header splits: identity on the left, age and links stacked upper-right,
@@ -59,9 +71,10 @@
   .repo { color: var(--muted); opacity: .6; font-weight: 400; }
   .state { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
            font-weight: 700; white-space: nowrap; }
-  .state.waiting { color: var(--amber); }
-  .state.busy    { color: var(--green); }
-  .state.agents  { color: var(--purple); }
+  .state { padding: 1px 7px; border-radius: 999px; }
+  .state.waiting { color: #fff; background: var(--amber); }
+  .state.busy    { color: #fff; background: var(--green); }
+  .state.agents  { color: #fff; background: var(--purple); }
   .state.parked  { color: var(--blue); }
   .state.idle    { color: var(--muted); }
   .age { color: var(--fg); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }

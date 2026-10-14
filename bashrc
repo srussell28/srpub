@@ -1031,6 +1031,11 @@ gnb() {
         gco -b $1 $2
     fi
 }
+ft() {
+    # Fleet dashboard: a web view of every ct/tmux session. --open launches a browser.
+    python3 "${SRPUB_DIR}/pytools/fleet.py" "$@"
+}
+
 _branch_is_merged() {
     # Is <branch>'s work already in <trunk>? Squash and rebase merges leave no
     # shared SHA, so fall back to replaying the branch's whole tree as one

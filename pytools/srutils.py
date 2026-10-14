@@ -35,6 +35,53 @@ sam_usernames = [
 ]
 
 
+def fetch_prs(cwd=None, head=None) -> list:
+    """Open PRs for a repo, newest first. Empty if gh is missing or unauthed.
+
+    head narrows to one branch, which a busy repo needs: the unfiltered list is
+    capped at 50 and your branch may not be in it.
+    """
+    out = cmd(
+        "gh pr list --json headRefName,number,title,state,reviewDecision,url,"
+        f"statusCheckRollup --limit 50 {f'--head {head}' if head else ''} 2>/dev/null",
+        cwd=cwd,
+    ).strip()
+    if not out.startswith("["):
+        return []
+    try:
+        raw = json.loads(out)
+    except json.JSONDecodeError:
+        return []
+    prs = []
+    for pr in raw:
+        checks = pr.get("statusCheckRollup") or []
+        states = [c.get("state") or c.get("conclusion") or "" for c in checks]
+        if not states:
+            ci = ""
+        elif any(s in ("FAILURE", "ERROR", "failed", "error") for s in states):
+            ci = "fail"
+        elif all(s in ("SUCCESS", "success", "NEUTRAL", "SKIPPED") for s in states):
+            ci = "pass"
+        else:
+            ci = "pending"
+        prs.append(
+            {
+                "branch": pr.get("headRefName", ""),
+                "number": pr.get("number"),
+                "title": pr.get("title", ""),
+                "review": pr.get("reviewDecision") or "",
+                "url": pr.get("url", ""),
+                "ci": ci,
+            }
+        )
+    return prs
+
+
+def fetch_prs_by_branch(cwd=None, head=None) -> dict:
+    """fetch_prs keyed by head branch, for callers wanting one PR per branch."""
+    return {pr["branch"]: pr for pr in fetch_prs(cwd=cwd, head=head)}
+
+
 def is_sam_machine() -> bool:
     """True on a machine of mine, where stamping my git identity is right."""
     return os.environ.get("USER", "") in sam_usernames
@@ -495,13 +542,13 @@ def _needs_shell(c):
     return any(ch in c for ch in "|&;<>$`")
 
 
-def cmd(c, wait=True, noisy=False, straight_through=False):
+def cmd(c, wait=True, noisy=False, straight_through=False, cwd=None):
     vprint(f"cmd: {c}")
     use_shell = _needs_shell(c)
     args = c if use_shell else shlex.split(c)
 
     if straight_through:
-        process = subprocess.Popen(args, shell=use_shell)
+        process = subprocess.Popen(args, shell=use_shell, cwd=cwd)
         process.communicate()
         return ""
 
@@ -509,6 +556,7 @@ def cmd(c, wait=True, noisy=False, straight_through=False):
         subprocess.Popen(
             args,
             shell=use_shell,
+            cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
@@ -519,6 +567,7 @@ def cmd(c, wait=True, noisy=False, straight_through=False):
         process = subprocess.Popen(
             args,
             shell=use_shell,
+            cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
@@ -536,6 +585,7 @@ def cmd(c, wait=True, noisy=False, straight_through=False):
         process = subprocess.Popen(
             args,
             shell=use_shell,
+            cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,

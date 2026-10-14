@@ -18,6 +18,7 @@ from colorstrings import (
 from srutils import (
     DiskCache,
     cmd,
+    fetch_prs_by_branch,
     get_term_size,
     is_sam_machine,
     is_windows,
@@ -374,43 +375,7 @@ def show_branches():
 
     remote_status = get_branch_remote_status()
 
-    # Fetch open PRs indexed by head branch name
-    prs_by_branch = {}
-    pr_json = cmd(
-        "gh pr list --json headRefName,number,title,state,reviewDecision,statusCheckRollup --limit 50 2>/dev/null"
-    ).strip()
-    if pr_json and pr_json.startswith("["):
-        import json
-
-        try:
-            for pr in json.loads(pr_json):
-                branch = pr.get("headRefName", "")
-                checks = pr.get("statusCheckRollup") or []
-                if isinstance(checks, list):
-                    states = [
-                        c.get("state") or c.get("conclusion") or "" for c in checks
-                    ]
-                    if any(
-                        s in ("FAILURE", "ERROR", "failed", "error") for s in states
-                    ):
-                        ci = "fail"
-                    elif all(
-                        s in ("SUCCESS", "success", "NEUTRAL", "SKIPPED")
-                        for s in states
-                    ):
-                        ci = "pass"
-                    else:
-                        ci = "pending"
-                else:
-                    ci = ""
-                prs_by_branch[branch] = {
-                    "number": pr.get("number"),
-                    "title": pr.get("title", ""),
-                    "review": pr.get("reviewDecision") or "",
-                    "ci": ci,
-                }
-        except (json.JSONDecodeError, KeyError):
-            pass
+    prs_by_branch = fetch_prs_by_branch()
 
     # One for-each-ref call: name, age, author
     raw = cmd(

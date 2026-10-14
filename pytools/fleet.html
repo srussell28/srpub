@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CT-dash</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%2314161a%22/><rect x=%226%22 y=%226%22 width=%229%22 height=%229%22 rx=%222%22 fill=%22%231baf7a%22/><rect x=%2217%22 y=%226%22 width=%229%22 height=%229%22 rx=%222%22 fill=%22%23eda100%22/><rect x=%226%22 y=%2217%22 width=%229%22 height=%229%22 rx=%222%22 fill=%22%237c5cd6%22/><rect x=%2217%22 y=%2217%22 width=%229%22 height=%229%22 rx=%222%22 fill=%22%236b6b6b%22/></svg>">
+<style>
+  :root {
+    --blue: #2a78d6; --orange: #eb6834; --green: #1baf7a; --amber: #eda100;
+    --red: #b0413e; --purple: #7c5cd6; --grey: #6b6b6b;
+    --bg: #fff; --fg: #1a1a1a; --muted: #6b6b6b; --line: #e4e4e4; --card: #fafafa;
+      --term: #eceef1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --blue: #3987e5; --orange: #d95926; --green: #199e70; --amber: #c98500;
+      --red: #c9524f; --purple: #8f72e0; --grey: #9a9a9a;
+      --bg: #14161a; --fg: #e8e8e8; --muted: #9a9a9a; --line: #2b2f36; --card: #1b1e24;
+      --term: #0e1014;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 18px 16px 40px; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  .counts { color: var(--muted); font-size: 13px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  #conn { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  /* Flex-wrapped grid: cards fill the width and reflow at any window size. */
+  #grid { display: grid; gap: 11px; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); align-items: start; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-top-width: 3px;
+    border-radius: 9px; cursor: pointer; overflow: hidden;
+    display: flex; flex-direction: column;
+    height: var(--card-h, 240px);
+  }
+  .card:hover { border-color: var(--blue); }
+  .card.waiting { border-top-color: var(--amber); }
+  .card.busy    { border-top-color: var(--green); }
+  .card.agents  { border-top-color: var(--purple); }
+  .card.parked  { border-top-color: var(--blue); }
+  .card.idle    { border-top-color: var(--line); }
+  .detached { opacity: .5; }
+
+  /* Header splits: identity on the left, age and links stacked upper-right,
+     so chips never push the terminal preview down. */
+  .head { display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px 12px; }
+  .head-main { flex: 1 1 auto; min-width: 0; }
+  .head-side { display: flex; flex-direction: column; align-items: flex-end;
+               gap: 2px; flex: none; }
+  .top { display: flex; align-items: flex-start; gap: 7px; }
+  .icon { font-size: 16px; line-height: 1.25; flex: none; }
+  /* repo is nearly always the same one, so it recedes behind the branch */
+  .repo { color: var(--muted); opacity: .6; font-weight: 400; }
+  .state { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+           font-weight: 700; white-space: nowrap; }
+  .state.waiting { color: var(--amber); }
+  .state.busy    { color: var(--green); }
+  .state.agents  { color: var(--purple); }
+  .state.parked  { color: var(--blue); }
+  .state.idle    { color: var(--muted); }
+  .age { color: var(--fg); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .age.dim { color: var(--muted); font-size: 10.5px; opacity: .8; }
+  .branch {
+    color: var(--fg); font-size: 12.5px; margin-top: 3px; opacity: .78;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* Two lines before truncating; the title attribute covers the rest. */
+  .topic { font-size: 14.5px; font-weight: 600; min-width: 0; overflow: hidden;
+           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+           line-height: 1.3; }
+  .topic.guessed { font-weight: 500; color: var(--muted); font-style: italic; }
+
+  .chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+  .chip, .pr {
+    font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line);
+    font-family: ui-monospace, Menlo, monospace; text-decoration: none; color: var(--muted);
+  }
+  .pr:hover { border-color: var(--blue); color: var(--blue); }
+  .pr.pass { border-color: var(--green); color: var(--green); }
+  .pr.fail { border-color: var(--red); color: var(--red); }
+  .pr.pending { border-color: var(--amber); color: var(--amber); }
+  .chip.agent { border-color: var(--purple); color: var(--purple); }
+  .chip.art { border-color: var(--blue); color: var(--blue); }
+  .chip.art:hover { background: var(--blue); color: #fff; }
+
+  /* column-reverse + reversed lines: the newest line sits at the bottom and
+     overflow clips the OLDEST off the top, never the line you want to see. */
+  .preview {
+    margin: 0; padding: 9px 13px 10px; border-top: 1px solid var(--line);
+    background: var(--term); flex: 1 1 auto; min-height: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: var(--muted); white-space: pre-wrap;
+    word-break: break-word;
+    display: flex; flex-direction: column-reverse;
+    overflow: hidden;
+  }
+  .empty { color: var(--muted); padding: 34px 0; text-align: center; }
+  @media (max-width: 620px) { .preview { display: none; } #grid { grid-template-columns: 1fr; } }
+</style>
+
+<header>
+  <h1>CT-dash</h1>
+  <span class="counts" id="counts"></span>
+  <span id="conn">connecting…</span>
+</header>
+<div id="grid"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const q = TOKEN ? "?token=" + encodeURIComponent(TOKEN) : "";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let rev = null;
+
+function age(ms) {
+  if (!ms) return "";
+  const h = (Date.now() - ms) / 3.6e6;
+  if (h < 1) return Math.max(1, Math.round(h * 60)) + "m";
+  if (h < 48) return Math.round(h) + "h";
+  return Math.round(h / 24) + "d";
+}
+
+// A session waiting on subagents is its own state: busy, but not by itself.
+// "busy" from claude means work in flight, which includes a background shell
+// left running while Claude itself sits idle. If it has not written in a
+// while, say so rather than claiming it is editing something.
+const QUIET = 120;
+function kindOf(r) {
+  if (r.status === "busy" && r.agents?.length) return "agents";
+  if (r.status === "busy" && r.quiet_for > QUIET) return "parked";
+  return r.status || "idle";
+}
+
+function render(rows) {
+  const n = { waiting: 0, busy: 0, agents: 0, parked: 0, idle: 0 };
+  rows.forEach(r => { const k = kindOf(r); if (k in n) n[k]++; });
+  counts.innerHTML =
+    `<span class="dot" style="background:var(--amber)"></span>${n.waiting} waiting` +
+    ` &nbsp;<span class="dot" style="background:var(--green)"></span>${n.busy} busy` +
+    ` &nbsp;<span class="dot" style="background:var(--purple)"></span>${n.agents} w/ agents` +
+    ` &nbsp;<span class="dot" style="background:var(--blue)"></span>${n.parked} background` +
+    ` &nbsp;<span class="dot" style="background:var(--grey)"></span>${n.idle} idle`;
+
+  if (!rows.length) { grid.innerHTML = '<div class="empty">No tmux sessions.</div>'; return; }
+
+  grid.innerHTML = rows.map(r => {
+    const kind = kindOf(r);
+    // Only a busy session is actually doing something; an idle one's last
+    // activity would read as if it were still happening.
+    // Five states. What kind of work a busy session is doing goes in the tooltip.
+    const LABEL = { waiting: "input", agents: "agents", parked: "background",
+                    busy: "busy", idle: "idle" };
+    const label = LABEL[kind] || r.status || "—";
+    const detail = r.waiting_for
+      || (kind === "agents" ? r.agents.join(", ") : "")
+      || (kind === "parked" && r.bg_shells ? `${r.bg_shells} shell${r.bg_shells > 1 ? "s" : ""} still running` : "")
+      || (r.doing || r.status || "");
+    const prs = (r.prs || []).map(p =>
+      `<a class="pr ${esc(p.ci)}" href="${esc(p.url)}" target="_blank" rel="noopener"
+          title="${esc(p.title)}" onclick="event.stopPropagation()"
+       >#${esc(p.number)}${p.ci ? " " + esc(p.ci) : ""}${p.review ? " " + esc(p.review.toLowerCase().slice(0, 4)) : ""}</a>`
+    ).join("");
+    const agents = (r.agents || []).map(a => `<span class="chip agent">◯ ${esc(a)}</span>`).join("");
+    const arts = (r.artifacts || []).map(a =>
+      `<a class="chip art" href="${esc(a.url)}" target="_blank" rel="noopener"
+          title="${esc(a.name)}${a.version ? " v" + a.version : ""}" onclick="event.stopPropagation()"
+       >◆ ${esc(a.name)}${a.version ? " v" + a.version : ""}</a>`
+    ).join("");
+    return `
+      <div class="card ${esc(kind)} ${r.attached ? "" : "detached"}" data-session="${esc(r.session)}">
+        <div class="head">
+          <div class="head-main">
+            <div class="top">
+              <span class="icon">${esc(r.icon || "·")}</span>
+              <span class="topic ${r.topic_source === "session" ? "" : "guessed"}"
+                    title="${esc(r.topic || r.branch || r.session)}"
+                >${esc(r.topic || r.branch || r.session)}</span>
+            </div>
+            <div class="branch" title="${esc((r.repo ? r.repo + ":" : "") + (r.branch || r.session))}"><span class="repo">${esc(r.repo ? r.repo + ":" : "")}</span>${esc(r.branch || r.session)}</div>
+            ${(prs || agents || arts) ? `<div class="chips">${agents}${prs}${arts}</div>` : ""}
+          </div>
+          <div class="head-side">
+            <span class="state ${esc(kind)}" title="${esc(detail)}">${esc(label)}</span>
+            <span class="age">${r.last_active ? esc(age(r.last_active)) + " ago" : ""}</span>
+            <span class="age dim">${esc(age(r.started_at))} old${r.attached ? "" : " · detached"}</span>
+          </div>
+        </div>
+        ${(r.preview || []).length ? `<div class="preview">${r.preview.slice().reverse().map(l => `<div>${esc(l)}</div>`).join("")}</div>` : ""}
+      </div>`;
+  }).join("");
+}
+
+grid.addEventListener("click", e => {
+  if (e.target.closest("a")) return;           // let PR links open normally
+  const card = e.target.closest(".card");
+  if (card) fetch(`/api/focus${q}${q ? "&" : "?"}session=${encodeURIComponent(card.dataset.session)}`);
+});
+
+// Cards share the viewport height: they stretch to fill it, stop shrinking at
+// MIN (the page scrolls instead) and stop growing at MAX (space is left over).
+const MIN_CARD = 160, MAX_CARD = 520, GAP = 11;
+
+function fit() {
+  const n = grid.children.length;
+  if (!n) return;
+  const cols = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+  const rows = Math.ceil(n / cols);
+  const avail = window.innerHeight - grid.getBoundingClientRect().top - 24;
+  const h = Math.min(MAX_CARD, Math.max(MIN_CARD, (avail - GAP * (rows - 1)) / rows));
+  document.documentElement.style.setProperty("--card-h", Math.floor(h) + "px");
+}
+addEventListener("resize", fit);
+
+function connect() {
+  const es = new EventSource("/events" + q);
+  es.onopen = () => { conn.textContent = "live"; conn.style.color = "var(--green)"; };
+  es.onmessage = e => {
+    const payload = JSON.parse(e.data);
+    if (rev && payload.rev !== rev) return location.reload();   // --dev edited the source
+    rev = payload.rev;
+    render(payload.rows || []);
+    fit();
+  };
+  es.onerror = () => {
+    conn.textContent = "reconnecting…"; conn.style.color = "var(--amber)";
+    es.close(); setTimeout(connect, 1500);
+  };
+}
+connect();
+</script>
+</html>

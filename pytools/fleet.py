@@ -718,6 +718,12 @@ def service_install(port: int) -> None:
         print(f"[ct-dash] launchctl: {out}")
 
 
+def service_restart() -> None:
+    """Reload the installed service so it picks up edited source."""
+    out = sh(["launchctl", "kickstart", "-k", f"gui/{os.getuid()}/{SERVICE_LABEL}"])
+    print(f"[ct-dash] restarted{': ' + out if out else ''}")
+
+
 def service_uninstall() -> None:
     sh(["launchctl", "bootout", f"gui/{os.getuid()}/{SERVICE_LABEL}"])
     if PLIST.exists():
@@ -738,10 +744,15 @@ def main():
         "--install-service", action="store_true", help="run at login (launchd)"
     )
     ap.add_argument("--uninstall-service", action="store_true")
+    ap.add_argument(
+        "--restart-service", action="store_true", help="reload the installed service"
+    )
     args = ap.parse_args()
 
     if args.uninstall_service:
         return service_uninstall()
+    if args.restart_service:
+        return service_restart()
     if args.install_service:
         return service_install(args.port)
 

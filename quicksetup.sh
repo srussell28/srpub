@@ -236,26 +236,6 @@ else
     echo "$SECRETS_SOURCE" >> "$SHELL_RC"
 fi
 
-# 6. Copy configs
-echo ""
-echo "--- Config files ---"
-for pair in vimrc:.vimrc condarc:.condarc psqlrc:.psqlrc tmux.conf:.tmux.conf; do
-    src="${pair%%:*}"
-    dest="$HOME/${pair#*:}"
-    if [ -f "$dest" ]; then
-        echo "$dest already exists, skipping."
-    else
-        echo "Copying $src -> $dest"
-        cp "$SRPUB_DIR/other_config/$src" "$dest"
-    fi
-done
-
-# 7. Claude config: symlink global CLAUDE.md and skills from the repo.
-# Symlinks (vs copies) mean a `git pull` updates every machine; per-skill
-# links let machine-local skills coexist in ~/.claude/skills.
-echo ""
-echo "--- Claude config ---"
-
 # install_link <src> <dest>: create/refresh symlink, never clobber real files
 install_link() {
     local src="$1" dest="$2"
@@ -273,6 +253,22 @@ install_link() {
         echo "Linked $dest -> $src"
     fi
 }
+
+# 6. Link configs
+echo ""
+echo "--- Config files ---"
+# Symlinked, not copied, so a git pull updates every machine (a copy would
+# stay frozen at whatever it was on first install).
+for pair in vimrc:.vimrc condarc:.condarc psqlrc:.psqlrc tmux.conf:.tmux.conf; do
+    src="${pair%%:*}"
+    install_link "$SRPUB_DIR/other_config/$src" "$HOME/${pair#*:}"
+done
+
+# 7. Claude config: symlink global CLAUDE.md and skills from the repo.
+# Symlinks (vs copies) mean a `git pull` updates every machine; per-skill
+# links let machine-local skills coexist in ~/.claude/skills.
+echo ""
+echo "--- Claude config ---"
 
 mkdir -p "$HOME/.claude/skills"
 if [ -f "$SRPUB_DIR/claude/CLAUDE.md" ]; then

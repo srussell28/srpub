@@ -349,5 +349,16 @@ if [ "$OS" = "Darwin" ]; then
     fi
 fi
 
+# 10. ct-dash at login (opt-in: it is a background service, not a dotfile)
+if [ "$OS" = "Darwin" ]; then
+    echo ""
+    echo "--- ct-dash ---"
+    if [ -f "$HOME/Library/LaunchAgents/ct-dash.plist" ]; then
+        echo "ct-dash already installed as a login service."
+    elif confirm "Run ct-dash (session dashboard) at login?"; then
+        python3 "$SRPUB_DIR/pytools/fleet.py" --install-service
+    fi
+fi
+
 echo ""
 echo "=== Setup complete ==="

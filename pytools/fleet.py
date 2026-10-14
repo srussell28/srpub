@@ -11,6 +11,7 @@ Bind to 0.0.0.0 to reach it from a phone over a VPN; that requires --token.
 """
 
 import argparse
+import contextlib
 import glob
 import json
 import os
@@ -30,7 +31,11 @@ from urllib.parse import parse_qs, urlparse
 from srutils import fetch_prs
 
 HERE = Path(__file__).resolve().parent
-POLL_SECONDS = 2  # session state and previews
+# Set while at least one page is streaming. Everything expensive waits on it,
+# so an unwatched service costs nothing but an idle socket.
+VIEWERS = threading.Event()
+POLL_FAST = 2  # a visible tab
+POLL_SLOW = 20  # a tab that is open but hidden
 PR_SECONDS = 300  # gh is slow and rate-limited, so refresh it rarely
 PREVIEW_LINES = 30  # the page clips to fit; send enough to fill a tall card
 PREVIEW_COLS = 160  # cap a wrapped line's share of the card
@@ -484,6 +489,7 @@ class PRCache:
 
     def _loop(self):
         while not self._stop.is_set():
+            VIEWERS.wait()  # nobody looking: do not spend gh calls
             fresh = {}
             out = sh(
                 ["tmux", "list-sessions", "-F", "#{session_name}\t#{session_path}"]
@@ -507,35 +513,60 @@ class Hub:
         self.listeners = []
         self.lock = threading.Lock()
         self.latest = {"rows": [], "rev": source_rev()}
+        self.taken_at = 0.0
+        self.collects = 0
 
     def start(self):
         threading.Thread(target=self._loop, daemon=True).start()
 
+    def refresh(self):
+        self.collects += 1
+        self.latest = {"rows": collect(self.prs.by_path), "rev": source_rev()}
+        self.taken_at = time.time()
+        return self.latest
+
+    def ensure_fresh(self, max_age=5):
+        """Collect on demand for a caller that is not streaming."""
+        if time.time() - self.taken_at > max_age:
+            self.refresh()
+        return self.latest
+
     def _loop(self):
         while True:
+            if not VIEWERS.is_set():
+                VIEWERS.wait()  # park until a page connects
+                continue
             try:
-                self.latest = {
-                    "rows": collect(self.prs.by_path),
-                    "rev": source_rev(),
-                }
+                self.refresh()
+                self.taken_at = now = time.time()
                 payload = json.dumps(self.latest)
                 with self.lock:
-                    for q in list(self.listeners):
-                        q.put(payload)
+                    for v in self.listeners:
+                        if now - v["sent"] + 0.01 >= v["every"]:
+                            v["sent"] = now
+                            with contextlib.suppress(queue.Full):
+                                v["q"].put_nowait(payload)
             except Exception as e:  # noqa: BLE001 - a bad frame must not kill the stream
                 print(f"[fleet] collect failed: {e}")
-            time.sleep(POLL_SECONDS)
+            time.sleep(self.interval())
 
-    def subscribe(self):
+    def interval(self) -> float:
+        """How often to collect: the most impatient viewer sets the pace."""
+        with self.lock:
+            return min((v["every"] for v in self.listeners), default=POLL_SLOW)
+
+    def subscribe(self, every: float):
         q = queue.Queue(maxsize=4)
         with self.lock:
-            self.listeners.append(q)
+            self.listeners.append({"q": q, "every": every, "sent": 0.0})
+            VIEWERS.set()
         return q
 
     def unsubscribe(self, q):
         with self.lock:
-            if q in self.listeners:
-                self.listeners.remove(q)
+            self.listeners = [v for v in self.listeners if v["q"] is not q]
+            if not self.listeners:
+                VIEWERS.clear()
 
 
 def make_handler(hub: Hub, token: str):
@@ -563,8 +594,20 @@ def make_handler(hub: Hub, token: str):
             if url.path == "/":
                 page = (HERE / "fleet.html").read_text()
                 return self._send(200, page.replace("__TOKEN__", token), "text/html")
+            if url.path == "/api/health":
+                return self._send(
+                    200,
+                    json.dumps(
+                        {
+                            "collects": hub.collects,
+                            "viewers": len(hub.listeners),
+                            "interval": hub.interval(),
+                            "age": round(time.time() - hub.taken_at, 1),
+                        }
+                    ),
+                )
             if url.path == "/api/fleet":
-                return self._send(200, json.dumps(hub.latest))
+                return self._send(200, json.dumps(hub.ensure_fresh()))
             if url.path == "/api/focus":
                 name = params.get("session", [""])[0]
                 if name in tmux_clients():
@@ -575,17 +618,21 @@ def make_handler(hub: Hub, token: str):
                     200, json.dumps({"ok": attach(name), "did": "attach"})
                 )
             if url.path == "/events":
-                return self._stream()
+                slow = params.get("rate", [""])[0] == "slow"
+                return self._stream(POLL_SLOW if slow else POLL_FAST)
             return self._send(404, '{"error":"not found"}')
 
-        def _stream(self):
+        def _stream(self, every):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            q = hub.subscribe()
+            q = hub.subscribe(every)
             try:
-                self.wfile.write(f"data: {json.dumps(hub.latest)}\n\n".encode())
+                # first frame is on demand, since the loop may have been parked
+                self.wfile.write(
+                    f"data: {json.dumps(hub.ensure_fresh(2))}\n\n".encode()
+                )
                 self.wfile.flush()
                 while True:
                     self.wfile.write(f"data: {q.get()}\n\n".encode())
@@ -624,6 +671,60 @@ def _watch_source():
         os.execv(sys.executable, [sys.executable, *sys.argv])
 
 
+SERVICE_LABEL = "ct-dash"
+PLIST = Path.home() / "Library/LaunchAgents" / f"{SERVICE_LABEL}.plist"
+
+
+def service_install(port: int) -> None:
+    """Install a LaunchAgent so ct-dash is up after every login."""
+    if sys.platform != "darwin":
+        raise SystemExit(
+            "ct-dash: --install-service is macOS-only (launchd). On Linux, wrap "
+            "fleet.py in a systemd --user unit."
+        )
+    log = Path.home() / ".logs" / "ct-dash.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    PLIST.parent.mkdir(parents=True, exist_ok=True)
+    # launchd starts with a bare PATH; tmux, claude and gh all live elsewhere.
+    path = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    PLIST.write_text(f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{SERVICE_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{sys.executable}</string>
+    <string>{HERE / "fleet.py"}</string>
+    <string>--port</string><string>{port}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>{path}</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>{log}</string>
+  <key>StandardErrorPath</key><string>{log}</string>
+</dict>
+</plist>
+""")
+    uid = os.getuid()
+    sh(["launchctl", "bootout", f"gui/{uid}/{SERVICE_LABEL}"])  # ignore if absent
+    out = sh(["launchctl", "bootstrap", f"gui/{uid}", str(PLIST)])
+    print(f"[ct-dash] installed {PLIST}")
+    print(f"[ct-dash] logs: {log}")
+    print(f"[ct-dash] http://{LOCAL_NAME}:{port}/")
+    if out:
+        print(f"[ct-dash] launchctl: {out}")
+
+
+def service_uninstall() -> None:
+    sh(["launchctl", "bootout", f"gui/{os.getuid()}/{SERVICE_LABEL}"])
+    if PLIST.exists():
+        PLIST.unlink()
+    print(f"[ct-dash] removed {PLIST}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -633,7 +734,16 @@ def main():
     ap.add_argument(
         "--dev", action="store_true", help="restart when fleet.py/fleet.html change"
     )
+    ap.add_argument(
+        "--install-service", action="store_true", help="run at login (launchd)"
+    )
+    ap.add_argument("--uninstall-service", action="store_true")
     args = ap.parse_args()
+
+    if args.uninstall_service:
+        return service_uninstall()
+    if args.install_service:
+        return service_install(args.port)
 
     token = args.token
     if args.host not in ("127.0.0.1", "localhost") and not token:

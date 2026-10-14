@@ -102,6 +102,8 @@
     overflow: hidden;
   }
   .empty { color: var(--muted); padding: 34px 0; text-align: center; }
+  /* Showing the last known state while the first fresh frame is on its way. */
+  body.stale #grid { filter: grayscale(1); opacity: .5; transition: opacity .15s; }
   @media (max-width: 620px) { .preview { display: none; } #grid { grid-template-columns: 1fr; } }
 </style>
 
@@ -217,21 +219,54 @@ function fit() {
 }
 addEventListener("resize", fit);
 
-function connect() {
-  const es = new EventSource("/events" + q);
-  es.onopen = () => { conn.textContent = "live"; conn.style.color = "var(--green)"; };
+// Three tiers: a closed page leaves the server parked, a hidden tab streams
+// slowly, a visible tab streams fast. On returning, what is on screen is
+// known-stale, so it greys out until the first fresh frame lands.
+let es = null, retry = null, mode = null;
+
+function connect(next) {
+  const want = next || (document.hidden ? "slow" : "fast");
+  if (es && mode === want) return;
+  disconnect();
+  mode = want;
+  const sep = q ? "&" : "?";
+  es = new EventSource("/events" + q + sep + "rate=" + want);
+  es.onopen = () => {
+    conn.textContent = mode === "slow" ? "slow" : "live";
+    conn.style.color = mode === "slow" ? "var(--muted)" : "var(--green)";
+  };
   es.onmessage = e => {
     const payload = JSON.parse(e.data);
     if (rev && payload.rev !== rev) return location.reload();   // --dev edited the source
     rev = payload.rev;
     render(payload.rows || []);
     fit();
+    document.body.classList.remove("stale");
   };
   es.onerror = () => {
     conn.textContent = "reconnecting…"; conn.style.color = "var(--amber)";
-    es.close(); setTimeout(connect, 1500);
+    const was = mode;
+    disconnect();
+    retry = setTimeout(() => connect(was), 1500);
   };
 }
+
+function disconnect() {
+  if (retry) { clearTimeout(retry); retry = null; }
+  if (es) { es.close(); es = null; }
+  mode = null;
+}
+
+addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    connect("slow");
+  } else {
+    document.body.classList.add("stale");   // what is on screen is old
+    conn.textContent = "refreshing…"; conn.style.color = "var(--amber)";
+    connect("fast");
+  }
+});
+addEventListener("pagehide", disconnect);
 connect();
 </script>
 </html>

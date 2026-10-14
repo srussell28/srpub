@@ -24,10 +24,11 @@ def tool_result(tid):
     }
 
 
-def digest(tmp_path, monkeypatch, entries):
+def digest(tmp_path, monkeypatch, entries, session="sid"):
     path = write_transcript(tmp_path, entries)
     monkeypatch.setattr(fleet, "transcript_path", lambda _sid: str(path))
-    return fleet.transcript_digest_uncached("sid")
+    fleet._AGENTS.pop(session, None)  # it carries agents across calls by design
+    return fleet.transcript_digest_uncached(session)
 
 
 def test_inflight_agents_exclude_finished(tmp_path, monkeypatch):
@@ -89,7 +90,7 @@ def test_activity_label_reflects_recent_tools(tmp_path, monkeypatch):
     out = digest(
         tmp_path, monkeypatch, [assistant(tool_use("b1", "Bash", command="ls"))]
     )
-    assert out["doing"] == "shell"
+    assert out["doing"] == "running"
 
     # Task outranks Bash: subagents are the more interesting signal.
     out = digest(
@@ -142,3 +143,22 @@ def test_chrome_filter_drops_claude_code_furniture():
         "⏺ Bash(ruff format pytools/fleet.py)",
     ]
     assert not any(fleet.is_chrome(line) for line in content)
+
+
+def test_a_long_running_agent_survives_falling_out_of_the_tail(tmp_path, monkeypatch):
+    """A Task launched hours ago is no longer in the tail, but still running."""
+    digest(
+        tmp_path,
+        monkeypatch,
+        [assistant(tool_use("a1", "Task", subagent_type="Explore"))],
+        session="long",
+    )
+    # a later window that no longer contains the launch
+    path = write_transcript(tmp_path, [assistant(tool_use("b1", "Bash"))])
+    monkeypatch.setattr(fleet, "transcript_path", lambda _sid: str(path))
+    assert fleet.transcript_digest_uncached("long")["agents"] == ["Explore"]
+
+    # ...until its result finally shows up
+    path = write_transcript(tmp_path, [tool_result("a1")])
+    monkeypatch.setattr(fleet, "transcript_path", lambda _sid: str(path))
+    assert fleet.transcript_digest_uncached("long")["agents"] == []

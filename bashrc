@@ -1032,8 +1032,11 @@ gnb() {
     fi
 }
 ft() {
-    # Fleet dashboard: a web view of every ct/tmux session. --open launches a browser.
-    python3 "${SRPUB_DIR}/pytools/fleet.py" "$@"
+    # CT-dash: a web view of every ct/tmux session. --open launches a browser.
+    # Prefer samdev's python, which has the anthropic SDK for AI summaries.
+    local py="$HOME/miniconda3/envs/samdev/bin/python"
+    [ -x "$py" ] || py=python3
+    "$py" "${SRPUB_DIR}/pytools/fleet.py" "$@"
 }
 
 _branch_is_merged() {

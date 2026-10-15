@@ -17,3 +17,5 @@ dependencies:
   - packaging
   - pillow
   - ruff
+  - pip:
+      - anthropic

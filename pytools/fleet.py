@@ -51,6 +51,29 @@ DEFAULT_PORT = int(os.environ.get("CT_DASH_PORT") or 7447)
 # A bulk worker summarizing many sessions, so the cheap model; override to taste.
 AI_MODEL = os.environ.get("CT_DASH_MODEL") or "claude-haiku-4-5"
 AI_SECONDS = 120  # one batched call, and only for sessions that changed
+KEY_VARS = ("CT_DASH_ANTHROPIC_KEY", "ANTHROPIC_API_KEY")
+
+
+def api_key() -> str:
+    """The key, from the environment or ~/.secretsrc.
+
+    launchd starts the service with a bare environment, so the shell's secrets
+    file is never sourced — read it here rather than copying the key into the
+    LaunchAgent, where it would be a second place to rotate.
+    """
+    for var in KEY_VARS:
+        if os.environ.get(var):
+            return os.environ[var]
+    try:
+        text = (Path.home() / ".secretsrc").read_text()
+    except OSError:
+        return ""
+    for line in text.splitlines():
+        line = line.strip().removeprefix("export ").strip()
+        name, _, value = line.partition("=")
+        if name.strip() in KEY_VARS:
+            return value.strip().strip("\"'")
+    return ""
 
 
 def source_rev() -> str:
@@ -589,7 +612,7 @@ class Summarizer:
         self.error = ""
 
     def available(self) -> bool:
-        return bool(anthropic) and bool(os.environ.get("ANTHROPIC_API_KEY"))
+        return bool(anthropic) and bool(api_key())
 
     def start(self):
         if not self.available():
@@ -604,8 +627,13 @@ class Summarizer:
             try:
                 self.refresh()
             except Exception as e:  # noqa: BLE001 - never take the stream down
-                self.error = str(e)[:120]
+                self.error = str(e)[:160]
                 print(f"[ct-dash] summary failed: {e}")
+                # A bad key, no credit or no permission will not fix itself;
+                # retrying every couple of minutes just burns requests.
+                if getattr(e, "status_code", None) in (400, 401, 403):
+                    print("[ct-dash] AI summaries disabled until restart")
+                    return
             time.sleep(AI_SECONDS)
 
     def _stale(self) -> list:
@@ -638,7 +666,7 @@ class Summarizer:
                 blocks.append(f"<session name={name!r}>\n{excerpt}\n</session>")
         if not blocks:
             return
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(api_key=api_key())
         reply = client.messages.create(
             model=AI_MODEL,
             max_tokens=1000,
@@ -757,6 +785,7 @@ def make_handler(hub: Hub, token: str):
                             "viewers": len(hub.listeners),
                             "interval": hub.interval(),
                             "age": round(time.time() - hub.taken_at, 1),
+                            "ai": getattr(hub.ai, "error", "") or "ok",
                         }
                     ),
                 )
@@ -863,13 +892,30 @@ def service_install(port: int) -> None:
 </plist>
 """)
     uid = os.getuid()
-    sh(["launchctl", "bootout", f"gui/{uid}/{SERVICE_LABEL}"])  # ignore if absent
-    out = sh(["launchctl", "bootstrap", f"gui/{uid}", str(PLIST)])
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{uid}/{SERVICE_LABEL}"],
+        capture_output=True,
+        check=False,
+    )
     print(f"[ct-dash] installed {PLIST}")
-    print(f"[ct-dash] logs: {log}")
-    print(f"[ct-dash] http://{LOCAL_NAME}:{port}/")
-    if out:
-        print(f"[ct-dash] launchctl: {out}")
+    # bootout returns before the old job has exited, and bootstrapping over a
+    # job that is still going fails, so retry rather than silently doing nothing.
+    for attempt in range(10):
+        done = subprocess.run(
+            ["launchctl", "bootstrap", f"gui/{uid}", str(PLIST)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if done.returncode == 0:
+            print(f"[ct-dash] logs: {log}")
+            print(f"[ct-dash] http://{LOCAL_NAME}:{port}/")
+            return
+        time.sleep(0.5)
+    raise SystemExit(
+        f"ct-dash: launchctl bootstrap failed: "
+        f"{(done.stderr or done.stdout or '').strip()}"
+    )
 
 
 def service_restart() -> None:

@@ -30,6 +30,11 @@ from urllib.parse import parse_qs, urlparse
 
 from srutils import fetch_prs
 
+try:  # optional: without it, cards keep the free heuristic line
+    import anthropic
+except ImportError:
+    anthropic = None
+
 HERE = Path(__file__).resolve().parent
 # Set while at least one page is streaming. Everything expensive waits on it,
 # so an unwatched service costs nothing but an idle socket.
@@ -43,6 +48,9 @@ LOCAL_NAME = "ct-dash.localhost"
 # 8787 is RStudio Server's default and 8888 is Jupyter's; 7447 collides with
 # neither, and sits below the ephemeral range the OS allocates from.
 DEFAULT_PORT = int(os.environ.get("CT_DASH_PORT") or 7447)
+# A bulk worker summarizing many sessions, so the cheap model; override to taste.
+AI_MODEL = os.environ.get("CT_DASH_MODEL") or "claude-haiku-4-5"
+AI_SECONDS = 120  # one batched call, and only for sessions that changed
 
 
 def source_rev() -> str:
@@ -357,7 +365,7 @@ def sort_key(row) -> tuple:
     return (0 if row["status"] == "waiting" else 1, row["started_at"] or 0)
 
 
-def collect(prs_by_path: dict) -> list:
+def collect(prs_by_path: dict, summaries: dict | None = None) -> list:
     """One row per tmux session, worst-first."""
     agents = claude_sessions()
     clients = tmux_clients()
@@ -404,6 +412,7 @@ def collect(prs_by_path: dict) -> list:
                 "artifacts": digest["artifacts"],
                 "attached": name in clients,
                 "prs": prs_by_path.get(path, []),
+                "ai": (summaries or {}).get(name, ""),
                 "preview": screen["preview"],
                 "bg_shells": screen["bg_shells"],
             }
@@ -505,11 +514,153 @@ class PRCache:
             self._stop.wait(PR_SECONDS)
 
 
+AI_PROMPT = """You are labelling a dashboard of coding sessions.
+
+For each session write ONE short sentence saying where the work was left and what
+it is now waiting on. Write it the way a colleague would answer "where is that
+up to?" — e.g. "waiting for overnight tests", "waiting for PR review",
+"monitoring for errors", "half way through migrating the auth tests".
+
+Rules:
+- 12 words or fewer, no trailing full stop, no session name, no preamble.
+- Say what it is waiting on when it is waiting; otherwise say where it got to.
+- Describe only what the transcript shows. If it is unclear, say "unclear".
+"""
+
+AI_SCHEMA = {
+    "type": "json_schema",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "summaries": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "session": {"type": "string"},
+                        "sentence": {"type": "string"},
+                    },
+                    "required": ["session", "sentence"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["summaries"],
+        "additionalProperties": False,
+    },
+}
+
+
+def transcript_excerpt(session_id, budget=2200) -> str:
+    """A compact trace of recent turns: what was asked, done and said."""
+    path = transcript_path(session_id)
+    if not path:
+        return ""
+    parts = []
+    for line in sh(["tail", "-n", "120", path], timeout=5).splitlines():
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if entry.get("isSidechain"):
+            continue
+        content = (entry.get("message") or {}).get("content")
+        who = entry.get("type")
+        if isinstance(content, str) and who in ("user", "assistant"):
+            parts.append(f"{who}: {' '.join(content.split())[:300]}")
+        elif isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "text" and who in ("user", "assistant"):
+                    parts.append(f"{who}: {' '.join(block['text'].split())[:300]}")
+                elif block.get("type") == "tool_use":
+                    parts.append(f"  [{block.get('name')}]")
+    text = "\n".join(parts[-40:])
+    return text[-budget:]
+
+
+class Summarizer:
+    """One batched call per cycle describing where each session was left."""
+
+    def __init__(self):
+        self.by_session = {}  # tmux session name -> sentence
+        self._stamps = {}  # session name -> transcript mtime already summarized
+        self.error = ""
+
+    def available(self) -> bool:
+        return bool(anthropic) and bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+    def start(self):
+        if not self.available():
+            self.error = "no anthropic SDK" if not anthropic else "no ANTHROPIC_API_KEY"
+            print(f"[ct-dash] AI summaries off: {self.error}")
+            return
+        threading.Thread(target=self._loop, daemon=True).start()
+
+    def _loop(self):
+        while True:
+            VIEWERS.wait()  # same gate as everything else
+            try:
+                self.refresh()
+            except Exception as e:  # noqa: BLE001 - never take the stream down
+                self.error = str(e)[:120]
+                print(f"[ct-dash] summary failed: {e}")
+            time.sleep(AI_SECONDS)
+
+    def _stale(self) -> list:
+        """Sessions whose transcript moved since we last described them."""
+        out = sh(["tmux", "list-sessions", "-F", "#{session_name}\t#{session_path}"])
+        agents = claude_sessions()
+        todo = []
+        for line in out.splitlines():
+            name, _, path = line.partition("\t")
+            sid = (agents.get(path) or {}).get("sessionId")
+            tpath = transcript_path(sid)
+            if not name or not tpath:
+                continue
+            try:
+                stamp = os.path.getmtime(tpath)
+            except OSError:
+                continue
+            if self._stamps.get(name) != stamp:
+                todo.append((name, sid, stamp))
+        return todo
+
+    def refresh(self):
+        todo = self._stale()
+        if not todo:
+            return
+        blocks = []
+        for name, sid, _ in todo[:12]:
+            excerpt = transcript_excerpt(sid)
+            if excerpt:
+                blocks.append(f"<session name={name!r}>\n{excerpt}\n</session>")
+        if not blocks:
+            return
+        client = anthropic.Anthropic()
+        reply = client.messages.create(
+            model=AI_MODEL,
+            max_tokens=1000,
+            system=AI_PROMPT,
+            output_config={"format": AI_SCHEMA},
+            messages=[{"role": "user", "content": "\n\n".join(blocks)}],
+        )
+        text = next((b.text for b in reply.content if b.type == "text"), "")
+        for row in json.loads(text).get("summaries", []):
+            if row.get("session") and row.get("sentence"):
+                self.by_session[row["session"]] = row["sentence"].strip()
+        for name, _, stamp in todo:
+            self._stamps[name] = stamp
+        self.error = ""
+
+
 class Hub:
     """Fans the latest snapshot out to every connected browser."""
 
-    def __init__(self, prs: PRCache):
+    def __init__(self, prs: PRCache, ai=None):
         self.prs = prs
+        self.ai = ai
         self.listeners = []
         self.lock = threading.Lock()
         self.latest = {"rows": [], "rev": source_rev()}
@@ -521,7 +672,10 @@ class Hub:
 
     def refresh(self):
         self.collects += 1
-        self.latest = {"rows": collect(self.prs.by_path), "rev": source_rev()}
+        self.latest = {
+            "rows": collect(self.prs.by_path, self.ai.by_session if self.ai else None),
+            "rev": source_rev(),
+        }
         self.taken_at = time.time()
         return self.latest
 
@@ -766,7 +920,9 @@ def main():
 
     prs = PRCache()
     prs.start()
-    hub = Hub(prs)
+    ai = Summarizer()
+    ai.start()
+    hub = Hub(prs, ai)
     hub.start()
 
     # *.localhost resolves to loopback without any hosts entry, and a name

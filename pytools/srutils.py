@@ -42,7 +42,7 @@ def fetch_prs(cwd=None, head=None) -> list:
     capped at 50 and your branch may not be in it.
     """
     out = cmd(
-        "gh pr list --json headRefName,number,title,state,reviewDecision,url,"
+        "gh pr list --json headRefName,number,title,state,reviewDecision,url,isDraft,"
         f"statusCheckRollup --limit 50 {f'--head {head}' if head else ''} 2>/dev/null",
         cwd=cwd,
     ).strip()
@@ -71,6 +71,7 @@ def fetch_prs(cwd=None, head=None) -> list:
                 "title": pr.get("title", ""),
                 "review": pr.get("reviewDecision") or "",
                 "url": pr.get("url", ""),
+                "draft": bool(pr.get("isDraft")),
                 "ci": ci,
             }
         )

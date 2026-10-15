@@ -2141,7 +2141,7 @@ _wt_prompt() {
     local gd
     gd=$(git rev-parse --git-dir 2>/dev/null)
     if [[ "$gd" == */worktrees/* ]]; then
-        _wt="%{$fg[magenta]%}[⑂${$(git rev-parse --show-toplevel):t}]%{$reset_color%} "
+        _wt="%{$fg[magenta]%}[${$(git rev-parse --show-toplevel):t}]%{$reset_color%} "
     else
         _wt=""
     fi

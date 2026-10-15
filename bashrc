@@ -2132,14 +2132,31 @@ if [[ $processor == *Apple* ]]; then
     show_arch="($cur_arch) "
 fi
 
+_wt_prompt() {
+    # %2~ shows the last two path components, which look identical in a repo and
+    # in its worktrees. Name the worktree when we are in one. The git call costs
+    # ~6ms, so only pay it when the directory actually changes.
+    [[ "$PWD" == "$_wt_pwd" ]] && return
+    _wt_pwd="$PWD"
+    local gd
+    gd=$(git rev-parse --git-dir 2>/dev/null)
+    if [[ "$gd" == */worktrees/* ]]; then
+        _wt="%{$fg[magenta]%}[⑂${$(git rev-parse --show-toplevel):t}]%{$reset_color%} "
+    else
+        _wt=""
+    fi
+}
+
 set_ps1() {
     if [[ $shell == *zsh* ]]; then
         autoload -U colors && colors
         setopt PROMPT_SUBST
+        precmd_functions=("${(@)precmd_functions:#_wt_prompt}")
+        precmd_functions+=(_wt_prompt)
         if [[ -n "$SSH_CLIENT" ]]; then
-            PROMPT='%{$fg[green]%}%m%{$reset_color%} %2~ %# '
+            PROMPT='${_wt}%{$fg[green]%}%m%{$reset_color%} %2~ %# '
         else
-            PROMPT='%{$fg[yellow]%}%2~ %#%{$reset_color%} '
+            PROMPT='${_wt}%{$fg[yellow]%}%2~ %#%{$reset_color%} '
         fi
         return
     fi

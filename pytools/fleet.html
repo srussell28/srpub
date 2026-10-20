@@ -28,9 +28,9 @@
   h1 { font-size: 17px; margin: 0; font-weight: 600; }
   .counts { color: var(--muted); font-size: 13px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
-  #toggle { font: inherit; font-size: 12px; color: var(--muted); background: none;
+  .toggle { font: inherit; font-size: 12px; color: var(--muted); background: none;
             border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; cursor: pointer; }
-  #toggle:hover { border-color: var(--blue); color: var(--blue); }
+  .toggle:hover { border-color: var(--blue); color: var(--blue); }
   #conn { margin-left: auto; font-size: 12px; color: var(--muted); }
 
   /* Flex-wrapped grid: cards fill the width and reflow at any window size. */
@@ -131,7 +131,8 @@
 <header>
   <h1>CT-dash</h1>
   <span class="counts" id="counts"></span>
-  <button id="toggle"></button>
+  <button class="toggle" data-hide="idle"></button>
+  <button class="toggle" data-hide="detached"></button>
   <span id="conn">connecting…</span>
 </header>
 <div id="grid"></div>
@@ -141,8 +142,10 @@ const TOKEN = "__TOKEN__";
 const q = TOKEN ? "?token=" + encodeURIComponent(TOKEN) : "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let rev = null, lastRows = [];
-let hideIdle = false;
-try { hideIdle = localStorage.hideIdle === "1"; } catch {}
+// Each header toggle hides the rows its predicate matches; choices persist per browser.
+const HIDE = { idle: r => kindOf(r) === "idle", detached: r => !r.attached };
+let hide = {};
+try { hide = JSON.parse(localStorage.hide || "{}"); } catch {}
 
 function age(ms) {
   if (!ms) return "";
@@ -174,10 +177,14 @@ function render(rows) {
     ` &nbsp;<span class="dot" style="background:var(--blue)"></span>${n.parked} background` +
     ` &nbsp;<span class="dot" style="background:var(--grey)"></span>${n.idle} idle`;
 
-  toggle.textContent = hideIdle ? `show idle (${n.idle})` : "hide idle";
-  if (hideIdle) rows = rows.filter(r => kindOf(r) !== "idle");
+  const all = rows;
+  document.querySelectorAll(".toggle").forEach(b => {
+    const k = b.dataset.hide;
+    b.textContent = hide[k] ? `show ${k} (${all.filter(HIDE[k]).length})` : `hide ${k}`;
+    if (hide[k]) rows = rows.filter(r => !HIDE[k](r));
+  });
   if (!rows.length) {
-    grid.innerHTML = `<div class="empty">${hideIdle && n.idle ? "All sessions idle." : "No tmux sessions."}</div>`;
+    grid.innerHTML = `<div class="empty">${all.length ? "All sessions hidden." : "No tmux sessions."}</div>`;
     return;
   }
 
@@ -235,12 +242,12 @@ function render(rows) {
   }).join("");
 }
 
-toggle.addEventListener("click", () => {
-  hideIdle = !hideIdle;
-  try { localStorage.hideIdle = hideIdle ? "1" : "0"; } catch {}
+document.querySelectorAll(".toggle").forEach(b => b.addEventListener("click", () => {
+  hide[b.dataset.hide] = !hide[b.dataset.hide];
+  try { localStorage.hide = JSON.stringify(hide); } catch {}
   render(lastRows);
   fit();
-});
+}));
 
 grid.addEventListener("click", e => {
   if (e.target.closest("a")) return;           // let PR links open normally

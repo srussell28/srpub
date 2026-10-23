@@ -1961,6 +1961,10 @@ ct() {
         (( i++ ))
     done
 
+    # Start the tmux server from ~ so a deleted worktree can't become its cwd
+    # (new panes fail to spawn if it does); sessions still start from $PWD.
+    tmux has-session 2>/dev/null || (cd ~ && tmux start-server \; set -g exit-empty off)
+
     # Ephemeral: tied to a name instead of a branch, so it survives checkouts
     # and never inherits/writes branch session state.
     if [ "$ephemeral" = true ]; then

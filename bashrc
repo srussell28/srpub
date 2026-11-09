@@ -1157,7 +1157,15 @@ gbd() {
             local wt_output_base
             wt_output_base=$(_bazel_output_base_for_path "$wt_path")
             echo "removing worktree at $wt_path for branch '$branch'" | yellow
-            if ! git worktree remove --force "$wt_path" 2>/dev/null; then
+            # Worktrees are huge (node_modules) and slow to rm: rename it aside, prune
+            # git's record so the branch can go now, and delete in the background
+            # (sweeping up any earlier deletes that got interrupted). Never the primary.
+            local trash="${wt_path%/*}/.deleting-${wt_path##*/}-$$"
+            if [ "$wt_path" != "$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')" ] \
+                && mv "$wt_path" "$trash" 2>/dev/null; then
+                git worktree prune
+                ( rm -rf "${wt_path%/*}"/.deleting-* >/dev/null 2>&1 & )
+            elif ! git worktree remove --force "$wt_path" 2>/dev/null; then
                 # Worktree dir is gone/corrupt (e.g. a stale Claude scratchpad).
                 # Prune the dead ref so git lets us delete the branch.
                 echo "worktree remove failed, pruning stale ref" | yellow

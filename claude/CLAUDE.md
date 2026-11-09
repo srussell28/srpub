@@ -6,6 +6,8 @@
 
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
+- When running a task we expect to take more than 45s, prefer to use background bash or subagents instead of holding the main agent busy for long stretches
+
 - Try to incrementally commit progress, I prefer not to have large changes sitting un-comitted (in unstaged/staged changes).  You may commit with --no-verify and then go work on fixing pre-commit later before pushing to streamline things.
 
 - Keep inline comments, PR descriptions, and function docstrings short — default to too short, I'll ask for more.  Before each sentence, ask whether someone reading the diff already knows it; if so, cut it.  Inline comments are 1-2 lines and only cover what's needed to understand the code as merged — the rationale for a change belongs in the PR description, not in the code.  Try to ensure the PR description links-to or summarizes the context and "why" behind a PR, and doesn't just list whats chagned.
@@ -19,6 +21,8 @@
 - I rebase feature branches onto the repo's trunk frequently (`origin/main`, or whatever that repo's trunk is), including from another tmux session mid-task.  So finding that the current branch's history was rewritten under you — same branch name, different commit SHAs, a newer merge-base, `rebase (start)`/`rebase (pick)` entries in `git reflog` — is normal and expected, not something to escalate.  Recognize it and proceed: confirm nothing of yours was dropped (the net diff of your commits against the new base should match what it was against the old base), then push with `--force-with-lease`.  Don't stop to ask permission just because a force-push is involved, and don't offer to cherry-pick around the rebase to preserve the old remote history.  This qualifies the multi-session rule above: a change in *which branch* is checked out still means stop and confirm, but a rewritten history *on the same branch* is just me rebasing — carry on.  Do still stop if the rebase looks wrong: your commits missing, unexpected conflicts, or the branch now based on something other than that trunk.
 
 - **Branch Names and Management**: Most project/feature branch names should be named "sam/{feature}".  When working on a larger project/refactor we may use a longer-lived orchestrator ct sessions attached to "sam/{feature}" branch, and make incremental PRs on branches "sam/{feature}-#".  For example a orchestrator ct on "sam/refactor-api" branch would create PRs on "sam/refactor-api-1" and "sam/refactor-api-2" and so-on.  This way we can have the claude-ct session maintain state across incremental PR progress merges.  If claude needs a temporary branch ( a one-off test, or a saved copy) try to keep it under the same prefix "sam/{feature}-{description}" so we can track/clean things up.  Use "-", not "/": git can't hold both "sam/x" and "sam/x/1".
+
+- **No stacked PRs unless I ask**: a "separate branch/PR" is always based on the trunk, never on another feature branch.  Merging a stacked PR just folds it into its parent PR, which is not a separation.  If the split work depends on an open PR's changes, say so and carry the final content in the new PR (accepting a conflict for whichever merges second) rather than stacking.
 
 - **Worktrees**: Git worktrees are permitted for parallel development on separate branches.
 

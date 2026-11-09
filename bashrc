@@ -1133,77 +1133,109 @@ nwt() {
     esac
 }
 
+_resolve_branch() {
+    # Echo the branch $1 names, fuzzy-matching if it is not an exact ref.
+    # Messages go to stderr so callers can capture just the name.
+    local branch="$1" matched
+    if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+        echo "$branch"
+        return 0
+    fi
+    matched=$(git branch | grep -v "^\*" | sed 's/^[+ ]*//' | _pick_match "$branch")
+    if [ -z "$matched" ]; then
+        echo "no branch matching '$branch'" | red >&2
+        return 1
+    fi
+    echo "auto-matching branch $matched" | yellow >&2
+    echo "$matched"
+}
+
+_unworktree() {
+    # Drop <branch>'s worktree and its bazel output base, keeping the branch.
+    # Shared by gbd (which then deletes the branch) and gba (which archives it).
+    local branch="$1" wt_path primary wt_output_base trash
+    wt_path=$(_worktree_path_for_branch "$branch")
+    [ -n "$wt_path" ] || return 0
+    primary=$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')
+    if [ "$wt_path" = "$primary" ]; then
+        echo "'$branch' is in the primary checkout, which keeps its cache" | yellow
+        return 0
+    fi
+    # capture this before the worktree goes away: the output base is keyed off
+    # the worktree path, so afterwards it is unidentifiable
+    wt_output_base=$(_bazel_output_base_for_path "$wt_path")
+    echo "removing worktree at $wt_path for branch '$branch'" | yellow
+    # Worktrees are huge (node_modules) and slow to rm: rename it aside, prune
+    # git's record so the branch is free now, and delete in the background
+    # (sweeping up any earlier deletes that got interrupted).
+    trash="${wt_path%/*}/.deleting-${wt_path##*/}-$$"
+    if mv "$wt_path" "$trash" 2>/dev/null; then
+        git worktree prune
+        ( rm -rf "${wt_path%/*}"/.deleting-* >/dev/null 2>&1 & )
+    elif ! git worktree remove --force "$wt_path" 2>/dev/null; then
+        # Worktree dir is gone/corrupt (e.g. a stale Claude scratchpad).
+        echo "worktree remove failed, pruning stale ref" | yellow
+        git worktree prune
+    fi
+    [ -d "$wt_path" ] || _bazel_remove_output_base "$wt_output_base"
+}
+
+_kill_branch_sessions() {
+    local branch="$1" repo session
+    repo=$(git_repo_name)
+    for session in "${repo}/${branch}" "${repo}/${branch}-codex"; do
+        if tmux has-session -t "=$session" 2>/dev/null; then
+            echo "Killing tmux session $session" | yellow
+            tmux kill-session -t "=$session"
+        fi
+    done
+}
+
+gba() {
+    # Archive a branch: drop its worktree and bazel cache and hide it from gs,
+    # but keep the branch and its claude session so it can be picked back up.
+    local branch
+    if [ -z "$1" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: gba <branch>   # un-worktree + archive, keeping the branch"
+        echo "  Frees the worktree and its bazel output base, kills the tmux"
+        echo "  session, and marks the branch archived in gs. The branch and its"
+        echo "  claude session survive: 'ct <branch>' picks it back up."
+        [ -n "$1" ] && return 0
+        return 1
+    fi
+    branch=$(_resolve_branch "$1") || return 1
+    local trunk="${GIT_TRUNK:-$(git_main_origin)}"
+    if [ "$branch" = "${trunk#origin/}" ]; then
+        echo "refusing to archive the trunk '$branch'" | red
+        return 1
+    fi
+    _unworktree "$branch" || return 1
+    _kill_branch_sessions "$branch"
+    gs --archive "$branch" || return 1
+    echo "archived '$branch' — branch kept, 'ct $branch' to resume" | green
+}
+
 gbd() {
-    local branch="$1"
-    # Resolve branch name (with fuzzy match if needed) before doing anything.
-    if ! git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
-        local matched
-        matched=$(git branch | grep -v "^\*" | sed 's/^[+ ]*//' | _pick_match "$branch")
-        if [ -z "$matched" ]; then
-            echo "no branch matching '$branch'" | red
-            return 1
-        fi
-        echo "auto-matching branch $matched" | yellow
-        branch="$matched"
-    fi
+    local branch
+    branch=$(_resolve_branch "$1") || return 1
+    _unworktree "$branch"
 
-    # If branch has a worktree, remove it first.
-    if [ -n "$branch" ]; then
-        local wt_path
-        wt_path=$(_worktree_path_for_branch "$branch")
-        if [ -n "$wt_path" ]; then
-            # capture this before the worktree goes away: the output base is
-            # keyed off the worktree path, so afterwards it is unidentifiable
-            local wt_output_base
-            wt_output_base=$(_bazel_output_base_for_path "$wt_path")
-            echo "removing worktree at $wt_path for branch '$branch'" | yellow
-            # Worktrees are huge (node_modules) and slow to rm: rename it aside, prune
-            # git's record so the branch can go now, and delete in the background
-            # (sweeping up any earlier deletes that got interrupted). Never the primary.
-            local trash="${wt_path%/*}/.deleting-${wt_path##*/}-$$"
-            if [ "$wt_path" != "$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')" ] \
-                && mv "$wt_path" "$trash" 2>/dev/null; then
-                git worktree prune
-                ( rm -rf "${wt_path%/*}"/.deleting-* >/dev/null 2>&1 & )
-            elif ! git worktree remove --force "$wt_path" 2>/dev/null; then
-                # Worktree dir is gone/corrupt (e.g. a stale Claude scratchpad).
-                # Prune the dead ref so git lets us delete the branch.
-                echo "worktree remove failed, pruning stale ref" | yellow
-                git worktree prune
-            fi
-            # only if the tree is really gone: wt_path can be the primary
-            # checkout (git worktree list includes it), which must keep its cache
-            [ -d "$wt_path" ] || _bazel_remove_output_base "$wt_output_base"
-        fi
-    fi
-
-    git branch -D "$branch"
-    if [ $? -eq 1 ]; then
+    if ! git branch -D "$branch"; then
         echo "failed to delete branch $branch" | red
         return 1
     fi
 
-    # Kill any tmux claude session for this branch
-    if [ -n "$branch" ]; then
-        local repo=$(git_repo_name)
-        local session_name
-        for session_name in "${repo}/${branch}" "${repo}/${branch}-codex"; do
-            if tmux has-session -t "=$session_name" 2>/dev/null; then
-                echo "Killing tmux session $session_name" | yellow
-                tmux kill-session -t "=$session_name"
-            fi
-        done
-        # Clean up branch_sessions and branch_parents maps
-        local key="${repo}/${branch}"
-        local map_file="$HOME/.claude/branch_sessions"
-        # Comment the row out rather than dropping it: the claude transcript
-        # outlives the branch, so keeping the id makes the session recoverable
-        # with ct <branch> --resume <sid>. Lookups match "^<key> ", so the
-        # prefix also stops a future branch of the same name resuming it.
-        [ -f "$map_file" ] && sed -i.bak "s|^${key} |#deleted:$(date +%F) ${key} |" "$map_file"
-        local parents_file="$HOME/.claude/branch_parents"
-        [ -f "$parents_file" ] && sed -i.bak "\|^${key} |d" "$parents_file"
-    fi
+    _kill_branch_sessions "$branch"
+    # Clean up branch_sessions and branch_parents maps
+    local key="$(git_repo_name)/${branch}"
+    local map_file="$HOME/.claude/branch_sessions"
+    # Comment the row out rather than dropping it: the claude transcript
+    # outlives the branch, so keeping the id makes the session recoverable
+    # with ct <branch> --resume <sid>. Lookups match "^<key> ", so the
+    # prefix also stops a future branch of the same name resuming it.
+    [ -f "$map_file" ] && sed -i.bak "s|^${key} |#deleted:$(date +%F) ${key} |" "$map_file"
+    local parents_file="$HOME/.claude/branch_parents"
+    [ -f "$parents_file" ] && sed -i.bak "\|^${key} |d" "$parents_file"
 }
 
 gl() {

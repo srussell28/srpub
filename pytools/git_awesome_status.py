@@ -552,6 +552,11 @@ def main():
         help="Show status as if this branch were checked out",
     )
     parser.add_argument(
+        "--trunk",
+        action="store_true",
+        help="also mark the trunk when it is not what this branch tracks",
+    )
+    parser.add_argument(
         "--branches",
         action="store_true",
         help="Show detailed analysis of all local branches",
@@ -843,32 +848,37 @@ def main():
             shown_shas.add(c.sha)
             show_sha_magenta(c.sha)
 
-        # Commits on main not yet rebased into fb
-        main_behind_raw = cmd(
-            f"git rev-list --count {target_ref}..{origin_main}"
-        ).strip()
-        try:
-            main_behind = int(main_behind_raw)
-        except ValueError:
-            main_behind = 0
-        print(grey_str("    ·········· " + origin_main + " ············"))
-        if main_behind > 0:
-            if main_behind > 5 and not showall:
-                print(
-                    grey_str(
-                        "   " + str(main_behind) + " commits behind " + origin_main
+        # Where the trunk sits, when it is not what we track. Drawn below the
+        # upstream marker, which reads as "older" — wrong whenever the trunk is
+        # ahead of the upstream, so only show it when asked.
+        if args.trunk:
+            main_behind_raw = cmd(
+                f"git rev-list --count {target_ref}..{origin_main}"
+            ).strip()
+            try:
+                main_behind = int(main_behind_raw)
+            except ValueError:
+                main_behind = 0
+            print(grey_str("    ·········· " + origin_main + " ············"))
+            if main_behind > 0:
+                if main_behind > 5 and not showall:
+                    print(
+                        grey_str(
+                            "   " + str(main_behind) + " commits behind " + origin_main
+                        )
                     )
-                )
-                done += 2
-            else:
-                main_shas = (
-                    cmd(f"git rev-list {target_ref}..{origin_main}").strip().split("\n")
-                )
-                for sha in main_shas:
-                    if sha:
-                        shown_shas.add(sha)
-                        show_sha_grey(sha)
-                        done += 1
+                    done += 2
+                else:
+                    main_shas = (
+                        cmd(f"git rev-list {target_ref}..{origin_main}")
+                        .strip()
+                        .split("\n")
+                    )
+                    for sha in main_shas:
+                        if sha:
+                            shown_shas.add(sha)
+                            show_sha_grey(sha)
+                            done += 1
     else:
         # Tracking main: my commits -> main separator -> behind main -> common
         for c in made:

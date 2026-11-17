@@ -6,7 +6,7 @@
 
 - When you create a new file you intend to keep, please run git add -N <newfile> (intent to add) so it shows in diffs
 
-- When running a task we expect to take more than 45s, prefer to use background bash or subagents instead of holding the main agent busy for long stretches
+- When running a task or monitor step we expect to take more than 45s, prefer to use background bash or subagents instead of holding the main agent busy for long stretches
 
 - Try to incrementally commit progress, I prefer not to have large changes sitting un-comitted (in unstaged/staged changes).  You may commit with --no-verify and then go work on fixing pre-commit later before pushing to streamline things.
 

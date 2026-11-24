@@ -185,6 +185,9 @@ alias logtail='$SRPUB_DIR/pytools/logtail.py'
 alias keepawake='$SRPUB_DIR/pytools/keepawake.py'
 alias peek='$SRPUB_DIR/pytools/peek.py'
 alias k='$SRPUB_DIR/pytools/peek.py'
+# Find a past claude session by content/title/alias and resume it
+alias cfind='$SRPUB_DIR/pytools/cfind.py'
+alias cf='$SRPUB_DIR/pytools/cfind.py'
 
 # Disk usage analysis + reclaimable-space report (read-only; --clean to free)
 alias diskfree='$SRPUB_DIR/pytools/diskfree.py'

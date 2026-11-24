@@ -67,7 +67,7 @@ def is_int(x):
 
 
 def epoch_to_date(e):
-    return datetime.datetime.fromtimestamp(e, datetime.timezone.utc).strftime(
+    return datetime.datetime.fromtimestamp(e, datetime.UTC).strftime(
         "%Y-%m-%d"
     )
 

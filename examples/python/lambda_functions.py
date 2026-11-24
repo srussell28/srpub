@@ -12,7 +12,7 @@ def foo(x):
 print(datetime.datetime.now())
 
 # Foo isnt executed here, its build into a special function
-lf = lambda: foo(8)  # noqa
+lf = lambda: foo(8)
 
 time.sleep(1)
 

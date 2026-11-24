@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import boto3
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+
+import boto3
 from srutils import size_to_human
 
 

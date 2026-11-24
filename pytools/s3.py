@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
-import sys
-import boto3
-import os
-import logging
 import argparse
+import logging
+import os
 import subprocess
+import sys
 from pathlib import Path
-from PIL import Image
-from botocore.exceptions import ClientError
 
+import boto3
+from botocore.exceptions import ClientError
+from PIL import Image
 from srutils import cmd, log
 
 logging.getLogger("botocore").setLevel(logging.WARNING)

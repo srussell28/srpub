@@ -2,7 +2,6 @@
 
 
 import os
-
 import random
 import re
 import sys
@@ -181,7 +180,7 @@ if __name__ == "__main__":
             text = sys.stdin.readline().rstrip()
             if text:
                 for i in range(deadlines):
-                    print("")
+                    print()
                 deadlines = 0
                 print_color(color, text)
             else:

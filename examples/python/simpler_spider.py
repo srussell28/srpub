@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import HTMLParser
 import time
-import urlparse
 from datetime import timedelta
 
+import HTMLParser
+import urlparse
 from tornado import gen, ioloop, queues
 
 base_url = "http://www.tornadoweb.org/en/stable/"

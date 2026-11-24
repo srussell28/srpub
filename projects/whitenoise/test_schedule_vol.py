@@ -2,8 +2,7 @@
 
 import datetime
 import time
-
-import mock
+from unittest import mock
 
 import schedule_vol
 

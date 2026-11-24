@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 
 
+import codecs
 import datetime
-import shutil
+import json
+import logging
 import math
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import time
-import codecs
-import json
-import logging
 
-from colorstrings import yellow_str, red_str
-
+from colorstrings import red_str, yellow_str
 
 os_name = os.name
 is_windows = sys.platform.lower().startswith("win")
@@ -132,7 +131,7 @@ def noisy_sleep(duration, tag=""):
             except Exception:
                 pass
     flushprint("                                                ")
-    print("")
+    print()
 
 
 def term_width(buffer=3):
@@ -342,7 +341,7 @@ def load_pickle(fname, default=None):
     try:
         with open(fname, "rb") as f:
             result = pickle.load(f)
-    except IOError:
+    except OSError:
         if default is not None:
             return default
         raise

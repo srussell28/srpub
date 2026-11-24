@@ -277,7 +277,7 @@ def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
         if cached:
             ts, data = cached.get("ts", 0), cached.get("data", {})
             if (
-                datetime.datetime.now(datetime.timezone.utc).timestamp() - ts
+                datetime.datetime.now(datetime.UTC).timestamp() - ts
                 < ttl_seconds
             ):
                 return data
@@ -318,7 +318,7 @@ def get_branch_remote_status(cache=None, ttl_seconds=300) -> dict:
         cache.set(
             cache_key,
             {
-                "ts": datetime.datetime.now(datetime.timezone.utc).timestamp(),
+                "ts": datetime.datetime.now(datetime.UTC).timestamp(),
                 "data": status,
             },
         )

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from srutils import cmd, GitNameMatcher
 import argparse
 import operator
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
+
+from srutils import GitNameMatcher, cmd
 
 
 def title_from_sha(sha):

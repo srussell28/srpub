@@ -31,8 +31,8 @@ import sys
 import time
 from pathlib import Path
 
-from srutils import DiskCache, cmd, size_to_human, yes_or_no
 from colorstrings import blue_str, bold_str, green_str, grey_str, red_str, yellow_str
+from srutils import DiskCache, cmd, size_to_human, yes_or_no
 
 is_mac = sys.platform == "darwin"
 HOME = Path.home()
@@ -276,9 +276,9 @@ def build_targets(cache, refresh):
         key = f"target:{npm_dir}"
         kb = cached(cache, key, lambda: du_kb(npm_dir), refresh)
         if shutil.which("npm"):
-            fn = lambda: cmd("npm cache clean --force 2>/dev/null")  # noqa: E731
+            fn = lambda: cmd("npm cache clean --force 2>/dev/null")
         else:
-            fn = lambda d=npm_dir: rm_contents(d)  # noqa: E731
+            fn = lambda d=npm_dir: rm_contents(d)
         targets.append(Target("npm cache (~/.npm)", kb, fn, cache_key=key))
 
     for conda_root in (HOME / "miniconda3", HOME / "anaconda3"):

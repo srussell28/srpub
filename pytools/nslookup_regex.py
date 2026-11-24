@@ -6,7 +6,7 @@ import socket
 import sys
 
 import colorstrings
-from srutils import save_pickle, load_pickle, cmd
+from srutils import cmd, load_pickle, save_pickle
 
 IGNORE_LIST = ["Administered by ARIN"]
 

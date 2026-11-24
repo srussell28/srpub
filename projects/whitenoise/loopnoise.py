@@ -1,6 +1,7 @@
 import multiprocessing
-import pygame
 import time
+
+import pygame
 
 
 def play_audio(filename):

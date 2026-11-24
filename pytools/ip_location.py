@@ -18,7 +18,7 @@ def load_db():
     print("Loading ip DB")
     res = {}
     with open(IP_PATH, "rb") as f:
-        for line in f.readlines():
+        for line in f:
             parts = line.split(",")
             ip_sub = parts[0]
             ip = ip_sub.split("/")[0]

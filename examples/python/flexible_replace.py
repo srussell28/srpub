@@ -27,6 +27,6 @@ print(text)
 
 target = "banana"
 
-res = re.sub("func\((.*?)" + target + "(.*?)\)", womp, text)
+res = re.sub(r"func\((.*?)" + target + r"(.*?)\)", womp, text)
 
 print(res)

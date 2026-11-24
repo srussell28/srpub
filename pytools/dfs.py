@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from srutils import cmd, to_metric_base
 import shutil
 from dataclasses import dataclass
 
+from srutils import cmd, to_metric_base
 
 ONE_GB = 1024**3
 TEN_GB = 10368709120

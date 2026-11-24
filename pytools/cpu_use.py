@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-from srutils import cmd
 import sys
 import time
+
+from srutils import cmd
 
 
 def is_int(x):

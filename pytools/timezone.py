@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from dateutil import parser
@@ -9,7 +9,7 @@ from dateutil.parser import UnknownTimezoneWarning
 
 warnings.simplefilter("error", UnknownTimezoneWarning)
 
-UTC = timezone.utc
+UTC = UTC
 EASTERN = ZoneInfo("America/New_York")
 
 # Common US/UTC timezone abbreviations not recognized by dateutil by default.
@@ -69,7 +69,7 @@ def parse_and_convert(datetime_str, show_relative=True, quiet=False):
         utc_dt = dt.astimezone(UTC)
         eastern_dt = dt.astimezone(EASTERN)
 
-        print("")
+        print()
         epoch_s = int(utc_dt.timestamp())
         epoch_ms = int(utc_dt.timestamp() * 1000)
         print(f"Local (24h): {local_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")

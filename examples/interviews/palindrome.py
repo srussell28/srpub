@@ -19,7 +19,7 @@ def palindrome_brute(s):
     results = []
     for seq_length in range(1, len(s) + 1):  # n
         print("seq_length", seq_length)
-        for start in range(0, len(s)):  # n
+        for start in range(len(s)):  # n
             end = start + seq_length
             if end > len(s):
                 continue

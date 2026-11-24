@@ -31,7 +31,7 @@ _TRIVIAL = {"ls", "cd", "gs", "gd", "vim", "cat", "git", "ll", "la"}
 
 
 class Entry:
-    __slots__ = ("dt", "session", "cmd", "prog")
+    __slots__ = ("cmd", "dt", "prog", "session")
 
     def __init__(self, dt, session, cmd):
         self.dt = dt

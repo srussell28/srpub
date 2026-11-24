@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import contextlib2
-import time
 import random
 import signal
+import time
+
+import contextlib2
 
 
 class TimeoutError(Exception):
@@ -42,7 +43,6 @@ def simulated_call():
         t = 4.0
 
     time.sleep(t)
-    return
 
 
 with ctxtimeout(HIGH_TIMEOUT):

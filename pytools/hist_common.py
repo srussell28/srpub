@@ -4,8 +4,8 @@ import argparse
 import operator
 import time
 
-from srutils import quick_ingest_line, flushprint
 from colorstrings import grey_str
+from srutils import flushprint, quick_ingest_line
 
 # |sort | uniq -c | sort -nr
 

@@ -5,7 +5,6 @@ import sys
 import time
 import uuid
 
-
 # constants
 ALICE_STATUS_RUNNING = "status_running"
 ALICE_STATUS_HEARTBEAT = "status_heartbeat"
@@ -133,8 +132,7 @@ def alice_init(name=None, custom_actions=None, debug=False):
         alice_name = name
     else:
         alice_name = sys.argv[0]
-        if alice_name.startswith("./"):
-            alice_name = alice_name[2:]
+        alice_name = alice_name.removeprefix("./")
 
     alice_host = cmd("hostname").strip()
     alice_status = ALICE_STATUS_RUNNING

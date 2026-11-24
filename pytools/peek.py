@@ -21,8 +21,8 @@ import mimetypes
 import shutil
 import subprocess
 import sys
-import zipfile
 import tarfile
+import zipfile
 from pathlib import Path
 
 # ---------------------------------------------------------------------------

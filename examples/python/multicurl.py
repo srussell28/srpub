@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import commands
 import multiprocessing
 from contextlib import closing
+
+import commands
 
 
 def foo(x):

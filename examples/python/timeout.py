@@ -55,7 +55,7 @@ except TimeoutError:
 # Context Manager Version
 #########################
 
-import contextlib2  # noqa
+import contextlib2
 
 
 @contextlib2.contextmanager

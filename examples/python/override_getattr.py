@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-class MyClass(object):
+class MyClass:
     def __init__(self):
         pass
 

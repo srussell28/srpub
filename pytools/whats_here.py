@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-import os
-import sys
 import argparse
-import subprocess
-from collections import defaultdict
+import os
 import re
+import subprocess
+import sys
+from collections import defaultdict
 
 
 def is_binary_file(file_path):
@@ -76,7 +76,7 @@ def count_lines(file_path, skip_binary=False):
 
         with open(file_path, "rb") as f:
             return sum(1 for _ in f)
-    except (UnicodeDecodeError, IOError, IsADirectoryError):
+    except (OSError, UnicodeDecodeError, IsADirectoryError):
         return 0
 
 

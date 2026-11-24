@@ -33,8 +33,8 @@ sample_flights = [
 # Solution
 
 from datetime import datetime  # noqa
-from collections import namedtuple, defaultdict  # noqa
-from heapq import heappush, heappop  # noqa
+from collections import namedtuple, defaultdict
+from heapq import heappush, heappop
 
 Flight = namedtuple("Flight", ["origin", "destination", "start", "end", "cost"])
 

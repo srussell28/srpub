@@ -3,12 +3,11 @@ import os
 import socket
 import time
 from datetime import datetime, timedelta
-import requests
 
+import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask
-
-from schedule_vol import get_now, Volumizer
+from schedule_vol import Volumizer, get_now
 from srutils import cmd
 
 app = Flask(__name__)
@@ -162,8 +161,9 @@ def play_brownnoise(filename):
 
 
 def play_shush_loop():
-    import pygame
     import threading
+
+    import pygame
 
     global _g
 

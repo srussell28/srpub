@@ -1,3 +1,5 @@
+- Be concise!  Except where additional detail is requested or necessary keep answers concise.
+
 - try to make things simple.  try to use fewer lines of code, and more straightforward code when possible as long as we dont have to sacrifice functionality
 
 - if there is a sufficiently tricky issue thats not obvious how to diagnose, its okay to add some debug logging and re-run, or even merge debug logging and await repro vs trying to guess the solution

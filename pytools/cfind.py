@@ -122,10 +122,10 @@ def main():
         print(
             f"     {blue_str(s['cwd'])} {grey_str(s['branch'])}  {grey_str(s['sid'])}"
         )
-        print(f"     {' '.join(s['prompt'].split())[:100]}")
+        print(f"     {' '.join(s['prompt'].split())[:100]}\n")
 
     try:
-        choice = input(f"\nResume which? [1-{len(found)}, Enter to cancel]: ").strip()
+        choice = input(f"Resume which? [1-{len(found)}, Enter to cancel]: ").strip()
     except (EOFError, KeyboardInterrupt):
         choice = ""
     if not choice.isdigit() or not 1 <= int(choice) <= len(found):

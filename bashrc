@@ -501,6 +501,21 @@ function dufa {
     while IFS= read -r f; do entries+=("$f"); done < <(ls -A1)
     duf "${entries[@]}"
 }
+# Like dufa, but only git-tracked files (fresh-clone size), with and without LFS.
+function dufg {
+    local lfs=$(mktemp) st=(-f '%z %N')
+    [ "$(uname)" = Linux ] && st=(-c '%s %n')
+    git ls-files -z | git check-attr -z --stdin filter | tr '\0' '\n' |
+        awk 'NR%3==1{p=$0} NR%3==0&&$0=="lfs"{print p}' >"$lfs"
+    git ls-files -z | xargs -0 stat "${st[@]}" 2>/dev/null |
+        awk -v lfs="$lfs" '
+            function h(v,  u,i){u="BKMGT";i=1;while(v>=1024&&i<5){v/=1024;i++};return sprintf("%.1f%s",v,substr(u,i,1))}
+            BEGIN{while((getline l<lfs)>0)L[l]=1}
+            {p=substr($0,index($0," ")+1); n=p; sub(/\/.*/,"",n); t[n]+=$1; if(!(p in L))g[n]+=$1}
+            END{print "0\tall\tno-LFS\tpath"; for(k in t)printf "%d\t%s\t%s\t%s\n",t[k],h(t[k]),h(g[k]),k}' |
+        sort -n | cut -f2- | column -t -s $'\t'
+    rm -f "$lfs"
+}
 
 # Use brew/apt installed watch - its better
 # watch () {
